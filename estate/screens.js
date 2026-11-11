@@ -60,9 +60,18 @@ export function renderList(view){
     pad.appendChild(blank);
   } else {
     if (dense()){
-      var box = el('<div class="trip-card dense-list"></div>');
-      Store.watches.forEach(function(w){ box.appendChild(watchRow(w, view)); });
-      list.appendChild(box);
+      /* 간단히 보기: 단지 하나가 카드 하나, 그 안에 평형이 한 줄씩 */
+      var groups = [], byComplex = {};
+      Store.watches.forEach(function(w){
+        if (!byComplex[w.complex_id]) groups.push(byComplex[w.complex_id] = []);
+        byComplex[w.complex_id].push(w);
+      });
+      groups.forEach(function(g){
+        var box = el('<div class="trip-card dense-card"><div class="dense-head">' +
+          '<span class="watch-name">' + esc(g[0].complex_name) + '</span>' + place(g[0].address) + '</div></div>');
+        g.forEach(function(w){ box.appendChild(watchRow(w, view)); });
+        list.appendChild(box);
+      });
     } else Store.watches.forEach(function(w){ list.appendChild(watchCard(w, view)); });
     var add = el('<button class="addcard" type="button">' + icon("plus") + '관심 단지 추가</button>');
     ripple(add, openAdd);
@@ -98,11 +107,11 @@ function removeWatch(w, repaint){
  * 왼쪽으로 밀면 삭제 단추가 드러난다. `slide`가 미는 면이고 `wrap`이 그 틀이다.
  * 밀고 난 뒤의 손 뗌은 누름으로 치지 않는다 — 밀다가 화면이 넘어가면 안 된다.
  */
-var OPEN_X = 84;
+var OPEN_X = 80;
 var opened = null;         /* 지금 열려 있는 것 하나. 다른 데를 건드리면 닫힌다 */
 function swipeToDelete(wrap, slide, w, view){
   var act = el('<button class="swipe-del" type="button" aria-label="' + esc(w.complex_name + " " + w.room_label) +
-    ' 삭제" tabindex="-1">' + icon("trash") + '<span>삭제</span></button>');
+    ' 삭제" tabindex="-1"><i>' + icon("trash") + '</i><span>삭제</span></button>');
   wrap.insertBefore(act, wrap.firstChild);
   var x0 = 0, y0 = 0, from = 0, dx = 0, drag = false, moved = false, id = null;
   function set(x, smooth){
@@ -161,16 +170,17 @@ function nums(w){
   return { series: series, last: series[series.length - 1], prev: series[series.length - 2], deal: w.last_deal };
 }
 
-/* 간단히 보기의 한 줄: 이름 · 평형, 그리고 최저 호가와 달라진 만큼 */
+/* 간단히 보기의 한 줄: 평형, 작은 추이선, 최저 호가와 그 아래 견줄 값 하나 */
 function watchRow(w, view){
   var n = nums(w);
+  var under = n.deal ? '실거래 ' + won(n.deal.price)
+    : n.prev && n.last ? chg(n.last.min_price, n.prev.min_price) : "";
   var row = el('<div class="dense-row"><button class="dense-open" type="button">' +
-    '<span class="dense-id"><b>' + esc(w.complex_name) + '</b>' +
-      '<small>' + esc(w.room_label) + ' · ' + TRADE[w.trade] +
-        (n.last ? ' · 매물 ' + n.last.count + '건' : '') + '</small></span>' +
+    '<span class="dense-id"><span class="watch-type">' + esc(w.room_label) + '</span>' +
+      '<small>' + TRADE[w.trade] + (n.last ? ' · 매물 ' + n.last.count + '건' : ' · 기록 전') + '</small></span>' +
+    sparkline(n.series.map(function(s){ return s.min_price; })) +
     '<span class="dense-num"><b>' + (n.last && n.last.min_price != null ? won(n.last.min_price) : "—") + '</b>' +
-      '<small>' + (n.deal ? '실거래 ' + won(n.deal.price) : (n.prev ? chg(n.last.min_price, n.prev.min_price) : "")) +
-      '</small></span></button></div>');
+      (under ? '<small>' + under + '</small>' : '') + '</span></button></div>');
   var open = row.querySelector(".dense-open");
   swipeToDelete(row, open, w, view);
   ripple(open, function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
@@ -182,7 +192,7 @@ function watchCard(w, view){
   var last = series[series.length - 1];
   var prev = series[series.length - 2];
   var deal = w.last_deal;
-  var card = el('<div class="trip-card"><button class="trip-open" type="button">' +
+  var wrap = el('<div class="swipe"><div class="trip-card"><button class="trip-open" type="button">' +
     '<div class="watch-top"><div class="watch-id">' +
       '<span class="watch-name">' + esc(w.complex_name) + '</span>' + place(w.address) +
     '</div><span class="watch-type">' + esc(w.room_label) + '</span></div>' +
@@ -198,10 +208,11 @@ function watchCard(w, view){
       (prev ? chg(last.min_price, prev.min_price) : "") +
       sparkline(series.map(function(s){ return s.min_price; })) +
       '<span class="watch-when">' + slotShort(last.slot) + '</span></div>' : "") +
-    '</button></div>');
-  swipeToDelete(card, card.querySelector(".trip-open"), w, view);
-  ripple(card.querySelector(".trip-open"), function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
-  return card;
+    '</button></div></div>');
+  /* 카드가 통째로 비켜서고, 그 자리에 삭제가 선다 */
+  swipeToDelete(wrap, wrap.querySelector(".trip-card"), w, view);
+  ripple(wrap.querySelector(".trip-open"), function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
+  return wrap;
 }
 
 /* ---------- one watch ---------- */
