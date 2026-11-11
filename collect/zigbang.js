@@ -43,7 +43,9 @@ async function place(complexId) {
     lawd_cd: String(d.local2_code || "").slice(0, 5),
     dong_name: d.local3 || "",
     jibun: String(d.bunji || ""),
-    bcode: String(d.bcode || "")
+    bcode: String(d.bcode || ""),
+    lat: Number(d.lat) || 0,
+    lng: Number(d.lng) || 0
   };
 }
 

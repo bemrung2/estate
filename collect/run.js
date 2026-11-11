@@ -12,6 +12,7 @@ const zigbang = require("./zigbang.js");
 const naver = require("./naver.js");
 const molit = require("./molit.js");
 const hogangnono = require("./hogangnono.js");
+const kb = require("./kb.js");
 
 const PLATFORMS = { zigbang, naver };
 const KST = 9 * 3600 * 1000;
@@ -107,8 +108,16 @@ async function ensure(data, group) {
     });
   }
   const noPlace = group.some((w) => !w.lawd_cd), noHgnn = group.some((w) => !w.hgnn_id);
-  if (noPlace || noHgnn) {
-    const { bcode, ...where } = await zigbang.place(head.complex_id);
+  const noNaver = group.some((w) => !w.naver_id);
+  if (noPlace || noHgnn || noNaver) {
+    const { bcode, lat, lng, ...where } = await zigbang.place(head.complex_id);
+    if (noNaver) {
+      /* 네이버 부동산의 그 단지 — KB가 단지마다 네이버 단지 코드를 알려준다 */
+      let nid = "";
+      try { nid = await kb.naverId({ bcode, lat, lng, name: head.complex_name }); }
+      catch (e) { /* 다음에 다시 */ }
+      if (nid) group.forEach((w) => { if (!w.naver_id) note(w.id, { naver_id: nid }); });
+    }
     if (noPlace) group.forEach((w) => { if (!w.lawd_cd) note(w.id, where); });
     if (noHgnn) {
       /* 호갱노노의 그 단지. 못 찾았으면 "-"로 적어 두어 열 때마다 다시 묻지 않는다 */

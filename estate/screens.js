@@ -285,13 +285,18 @@ function askRow(l, mark, dead){
 
 /* 실거래를 볼 기간. 고른 것은 화면을 옮겨도 그대로다 */
 var PERIODS = [
-  { key: "3m", label: "3개월", months: 3 },
-  { key: "1y", label: "1년", months: 12 },
-  { key: "3y", label: "3년", months: 36 },
-  { key: "5y", label: "5년", months: 60 }
+  { key: "5y", label: "전체 (5년)", said: "최근 5년", months: 60 },
+  { key: "3y", label: "최근 3년", said: "최근 3년", months: 36 },
+  { key: "1y", label: "최근 1년", said: "최근 1년", months: 12 },
+  { key: "3m", label: "최근 3개월", said: "최근 3개월", months: 3 }
 ];
-var period = "1y";
-var LIST_FIRST = 12;
+var period = "5y";
+var LIST_FIRST = 30;
+
+function since(months){
+  var to = new Date();
+  return isoDay(new Date(to.getFullYear(), to.getMonth() - months, to.getDate()));
+}
 
 function isoDay(d){
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -310,22 +315,25 @@ function dealsCard(w){
     return card;
   }
 
-  var picks = el('<div class="pickrow deal-periods"></div>');
+  /* 기간마다 몇 건인지 단추에 적어 둔다 — 눌러 보지 않아도 어디에 거래가 있는지 보인다 */
+  var picks = el('<div class="pickrow scroll deal-periods"></div>');
   var body = el('<div></div>');
   card.appendChild(picks);
   card.appendChild(body);
-  pickGroup(picks, PERIODS, function(){ return period; }, function(k){ period = k; paint(false); });
+  pickGroup(picks, PERIODS.map(function(p){
+    var from = since(p.months);
+    return { key: p.key, label: p.label + " " + all.filter(function(d){ return d.date >= from; }).length };
+  }), function(){ return period; }, function(k){ period = k; paint(false); });
 
   function paint(more){
     var p = PERIODS.filter(function(x){ return x.key === period; })[0];
-    var to = new Date(), from = new Date(to.getFullYear(), to.getMonth() - p.months, to.getDate());
-    var fromIso = isoDay(from), toIso = isoDay(to);
+    var fromIso = since(p.months), toIso = isoDay(new Date());
     var inRange = all.filter(function(d){ return d.date >= fromIso; });
     var live = inRange.filter(function(d){ return !d.canceled; });
     body.innerHTML = "";
     if (!inRange.length){
-      body.appendChild(el('<p class="card-empty">최근 ' + p.label + ' 동안 신고된 거래가 없습니다.' +
-        ' 더 긴 기간을 골라 보세요.</p>'));
+      body.appendChild(el('<p class="card-empty">' + p.said + ' 동안 신고된 거래가 없습니다.' +
+        (all.length ? ' 전체 ' + all.length + '건은 더 긴 기간에 있습니다.' : '') + '</p>'));
       return note();
     }
     if (live.length){
@@ -340,6 +348,9 @@ function dealsCard(w){
       body.appendChild(el('<div class="legend"><span><i class="lg deal"></i>거래</span>' +
         '<span><i class="lg dealavg"></i>월 평균</span></div>'));
     }
+    body.appendChild(el('<p class="deal-count">' + p.said + ' <b>' + inRange.length + '건</b>' +
+      (inRange.length < all.length ? ' · 전체 ' + all.length + '건 중' : '') +
+      (inRange.length > live.length ? ' · 해제 ' + (inRange.length - live.length) + '건 포함' : '') + '</p>'));
     /* 달마다 묶어서 — 언제 얼마나 거래됐는지가 먼저 보이게 */
     var shownRows = more ? inRange : inRange.slice(0, LIST_FIRST);
     var month = "";
@@ -355,7 +366,8 @@ function dealsCard(w){
         '<span class="when">' + Number(d.date.slice(8, 10)) + '일</span></div>'));
     });
     if (!more && inRange.length > LIST_FIRST){
-      var b = el('<button class="quietbtn deal-more" type="button">나머지 ' + (inRange.length - LIST_FIRST) + '건 더 보기</button>');
+      var b = el('<button class="btn btn-quiet deal-more" type="button">' + inRange.length + '건 중 ' + LIST_FIRST +
+        '건을 보는 중 · 나머지 ' + (inRange.length - LIST_FIRST) + '건 모두 보기</button>');
       ripple(b, function(){ paint(true); });
       body.appendChild(b);
     }
@@ -491,12 +503,12 @@ function openAdd(){
     var manual = '네이버 부동산에서 <a href="' + esc(naverSearchUrl(chosen.name)) +
       '" target="_blank" rel="noopener">이 단지를 열고</a> 그 주소를 붙여넣으면 네이버 매물도 함께 기록합니다.';
     var mine = asked;
-    Store.findNaver(chosen.name).then(function(data){
+    Store.findNaver(chosen.id, chosen.name).then(function(data){
       if (mine !== asked && !naverInput.isConnected) return;
       naverInput.placeholder = "https://new.land.naver.com/complexes/…";
       if (data && data.naverId && !naverInput.value){
         naverInput.value = naverComplexUrl(data.naverId);
-        hint.innerHTML = '이름으로 찾은 단지입니다. <a href="' + esc(naverComplexUrl(data.naverId)) +
+        hint.innerHTML = '자동으로 찾은 네이버 단지입니다. <a href="' + esc(naverComplexUrl(data.naverId)) +
           '" target="_blank" rel="noopener">맞는지 열어 보기</a>';
       } else hint.innerHTML = "자동으로 찾지 못했습니다. " + manual;
     }).catch(function(){

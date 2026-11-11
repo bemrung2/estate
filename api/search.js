@@ -3,13 +3,14 @@
  *
  *   GET /api/search?q=헬리오          -> { ok, complexes: [{ id, name, address, households }] }
  *   GET /api/search?complex=38487    -> { ok, types: [{ id, label, supply, exclusive, count:{trade,charter} }] }
- *   GET /api/search?naver=헬리오시티   -> { ok, naverId }   네이버 단지 번호를 이름으로 찾아본다
- *                                       (못 찾거나 네이버가 받지 않으면 "")
+ *   GET /api/search?naverOf=38487&name=헬리오시티
+ *                                    -> { ok, naverId }   그 단지의 네이버 단지 번호 (KB부동산이
+ *                                       단지마다 알려준다. 못 찾으면 "")
  */
 const lib = require("./_core.js");
 const { open } = require("./_data.js");
 const zigbang = require("../collect/zigbang.js");
-const naver = require("../collect/naver.js");
+const kb = require("../collect/kb.js");
 
 module.exports = async function handler(req, res) {
   const home = open();
@@ -17,12 +18,15 @@ module.exports = async function handler(req, res) {
   try {
     const url = new URL(req.url, "http://x");
 
-    const name = url.searchParams.get("naver");
-    if (name) {
-      let naverId = "", message = "";
-      try { naverId = await naver.find(name.trim().slice(0, 40)); }
-      catch (e) { message = String(e.message || e).slice(0, 120); }
-      return lib.json(res, 200, { ok: true, naverId, message });
+    const of = url.searchParams.get("naverOf");
+    if (of) {
+      if (!/^\d{1,12}$/.test(of)) return lib.json(res, 400, { ok: false, error: "complex" });
+      let naverId = "";
+      try {
+        const where = await zigbang.place(of);
+        naverId = await kb.naverId({ ...where, name: (url.searchParams.get("name") || "").trim().slice(0, 60) });
+      } catch (e) { /* 못 찾은 것으로 친다 */ }
+      return lib.json(res, 200, { ok: true, naverId });
     }
 
     const complex = url.searchParams.get("complex");

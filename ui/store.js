@@ -44,7 +44,9 @@ export var Store = {
   live(id){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=now"); },
   search(q){ return ask("api/search?q=" + encodeURIComponent(q)); },
   types(complexId){ return ask("api/search?complex=" + encodeURIComponent(complexId)); },
-  findNaver(name){ return ask("api/search?naver=" + encodeURIComponent(name)); },
+  findNaver(complexId, name){
+    return ask("api/search?naverOf=" + encodeURIComponent(complexId) + "&name=" + encodeURIComponent(name));
+  },
   post(body){
     return ask("api/watch", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)

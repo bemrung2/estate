@@ -243,3 +243,8 @@ a.ask:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; bord
 .deal-month span{ font-size: 10.5px; font-weight: 600; color: var(--ink-faint); }
 .deal-month + .deal-row{ border-top: none; }
 .deal-more{ margin: 6px 0 0 -9px; }
+.deal-periods{ margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; }
+.deal-count{ margin: 14px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+.deal-count b{ color: var(--ink); font-weight: 700; }
+.deal-count + .deal-month{ margin-top: 8px; }
+.deal-more{ width: 100%; margin: 12px 0 0; font-size: 13px; padding: 11px 14px; }

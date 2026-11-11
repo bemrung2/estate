@@ -70,7 +70,7 @@ module.exports = async function handler(req, res) {
         const stale = molit.enabled() && (!watch.deals_at || !molit.complete(watch) ||
           (!(watch.deals || []).length && Date.now() - Date.parse(watch.deals_at) > 600 * 1000));
         const fresh = !Number(watch.exclusive_m2) || !watch.lawd_cd || stale;
-        if (fresh || !watch.hgnn_id) {
+        if (fresh || !watch.hgnn_id || !watch.naver_id) {
           try {
             const group = await ensure(data, watches.filter((w) => w.complex_id === watch.complex_id && w.trade === watch.trade));
             if (fresh) await refreshDeals(data, group, {}, 30);
@@ -149,7 +149,7 @@ module.exports = async function handler(req, res) {
       const naverId = naver.complexNo(clean(add.naver, 200)) || (sibling && sibling.naver_id) || "";
       let where = sibling ? { lawd_cd: sibling.lawd_cd, dong_name: sibling.dong_name, jibun: sibling.jibun } : null;
       if (!where || !where.lawd_cd) {
-        try { const { bcode, ...rest } = await zigbang.place(complexId); where = rest; }
+        try { const { bcode, lat, lng, ...rest } = await zigbang.place(complexId); where = rest; }
         catch (e) { where = { lawd_cd: "", dong_name: "", jibun: "" }; }
       }
 
