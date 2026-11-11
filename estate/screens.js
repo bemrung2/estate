@@ -1,6 +1,6 @@
 /* The screens: the watch list, one 단지 · 평형 over time, and the sheet that
    adds a new one. */
-import { el, esc, icon, ripple, toast, toastDone } from "../ui/dom.js";
+import { el, esc, icon, ripple, toast, toastDone, toastUndo } from "../ui/dom.js";
 import { Store } from "../ui/store.js";
 import { themeButton } from "../ui/theme.js";
 import { brandMark, pageFooter } from "../ui/shell.js";
@@ -33,6 +33,13 @@ function outlink(label, url){
 export function renderList(view){
   var pad = el('<div class="pad"></div>');
   var head = el('<div class="page-head"><div class="page-title">' + brandMark() + '</div></div>');
+  if (Store.state === "ok" && Store.watches.length){
+    /* 카드로 볼지, 한 줄씩 볼지 */
+    var mode = el('<button class="icon-btn" type="button" aria-label="' +
+      (dense() ? "카드로 보기" : "간단히 보기") + '">' + icon(dense() ? "cards" : "rows") + '</button>');
+    ripple(mode, function(){ setDense(!dense()); renderList(view); });
+    head.appendChild(mode);
+  }
   head.appendChild(themeButton(function(){ renderList(view); }));
   pad.appendChild(head);
 
@@ -52,7 +59,11 @@ export function renderList(view){
     ripple(blank.querySelector(".btn"), openAdd);
     pad.appendChild(blank);
   } else {
-    Store.watches.forEach(function(w){ list.appendChild(watchCard(w)); });
+    if (dense()){
+      var box = el('<div class="trip-card dense-list"></div>');
+      Store.watches.forEach(function(w){ box.appendChild(watchRow(w, view)); });
+      list.appendChild(box);
+    } else Store.watches.forEach(function(w){ list.appendChild(watchCard(w, view)); });
     var add = el('<button class="addcard" type="button">' + icon("plus") + '관심 단지 추가</button>');
     ripple(add, openAdd);
     list.appendChild(add);
@@ -69,7 +80,104 @@ function swap(view, node){
   window.scrollTo(0, 0);
 }
 
-function watchCard(w){
+/* 간단히 보기를 골랐는가 — 이 브라우저가 기억한다 */
+function dense(){
+  try{ return localStorage.getItem("estate.dense") === "1"; }catch(e){ return false; }
+}
+function setDense(on){
+  try{ localStorage.setItem("estate.dense", on ? "1" : "0"); }catch(e){ /* private mode */ }
+}
+
+/* 지우고, 몇 초 동안 되돌릴 수 있게 한다. 어디서 지우든 이 길이다. */
+var UNDO_MS = 5000;
+function removeWatch(w, repaint){
+  return Store.removeSoon(w, UNDO_MS, repaint);
+}
+
+/*
+ * 왼쪽으로 밀면 삭제 단추가 드러난다. `slide`가 미는 면이고 `wrap`이 그 틀이다.
+ * 밀고 난 뒤의 손 뗌은 누름으로 치지 않는다 — 밀다가 화면이 넘어가면 안 된다.
+ */
+var OPEN_X = 84;
+var opened = null;         /* 지금 열려 있는 것 하나. 다른 데를 건드리면 닫힌다 */
+function swipeToDelete(wrap, slide, w, view){
+  var act = el('<button class="swipe-del" type="button" aria-label="' + esc(w.complex_name + " " + w.room_label) +
+    ' 삭제" tabindex="-1">' + icon("trash") + '<span>삭제</span></button>');
+  wrap.insertBefore(act, wrap.firstChild);
+  var x0 = 0, y0 = 0, from = 0, dx = 0, drag = false, moved = false, id = null;
+  function set(x, smooth){
+    slide.style.transition = smooth ? "transform 200ms cubic-bezier(0.2, 0, 0, 1)" : "none";
+    slide.style.transform = x ? "translateX(" + x + "px)" : "";
+    wrap.classList.toggle("swiped", x < 0);
+  }
+  function close(){ set(0, true); act.tabIndex = -1; if (opened === close) opened = null; }
+  slide.addEventListener("pointerdown", function(e){
+    if (e.button && e.button !== 0) return;
+    /* 다른 줄이 열려 있었으면 이 누름은 그것을 닫는 데 쓰인다 — 화면을 넘기지 않는다 */
+    var other = opened && opened !== close;
+    if (other) opened();
+    x0 = e.clientX; y0 = e.clientY; from = opened === close ? -OPEN_X : 0; dx = 0;
+    drag = false; moved = !!other; id = e.pointerId;
+  });
+  slide.addEventListener("pointermove", function(e){
+    if (id !== e.pointerId) return;
+    var mx = e.clientX - x0, my = e.clientY - y0;
+    if (!drag){
+      if (Math.abs(mx) < 8 || Math.abs(mx) < Math.abs(my) * 1.2) return;
+      drag = true; moved = true;
+      try{ slide.setPointerCapture(id); }catch(err){ /* 이미 놓였다 */ }
+    }
+    dx = Math.max(-OPEN_X - 24, Math.min(0, from + mx));
+    set(dx, false);
+  });
+  function up(e){
+    if (id !== e.pointerId) return;
+    id = null;
+    if (!drag) return;
+    drag = false;
+    if (dx < -OPEN_X / 2){ set(-OPEN_X, true); opened = close; act.tabIndex = 0; }
+    else close();
+  }
+  slide.addEventListener("pointerup", up);
+  slide.addEventListener("pointercancel", up);
+  /* 민 직후의 클릭, 그리고 열려 있을 때의 클릭은 닫기만 한다 */
+  slide.addEventListener("click", function(e){
+    if (moved || opened === close){
+      e.stopImmediatePropagation(); e.preventDefault();
+      if (!moved) close();
+      moved = false;
+    }
+  }, true);
+  ripple(act, function(){
+    opened = null;
+    var undo = removeWatch(w, function(){ renderList(view); });
+    renderList(view);
+    toastUndo("삭제했습니다.", undo);
+  });
+}
+
+function nums(w){
+  var series = Store.series[w.id] || [];
+  return { series: series, last: series[series.length - 1], prev: series[series.length - 2], deal: w.last_deal };
+}
+
+/* 간단히 보기의 한 줄: 이름 · 평형, 그리고 최저 호가와 달라진 만큼 */
+function watchRow(w, view){
+  var n = nums(w);
+  var row = el('<div class="dense-row"><button class="dense-open" type="button">' +
+    '<span class="dense-id"><b>' + esc(w.complex_name) + '</b>' +
+      '<small>' + esc(w.room_label) + ' · ' + TRADE[w.trade] +
+        (n.last ? ' · 매물 ' + n.last.count + '건' : '') + '</small></span>' +
+    '<span class="dense-num"><b>' + (n.last && n.last.min_price != null ? won(n.last.min_price) : "—") + '</b>' +
+      '<small>' + (n.deal ? '실거래 ' + won(n.deal.price) : (n.prev ? chg(n.last.min_price, n.prev.min_price) : "")) +
+      '</small></span></button></div>');
+  var open = row.querySelector(".dense-open");
+  swipeToDelete(row, open, w, view);
+  ripple(open, function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
+  return row;
+}
+
+function watchCard(w, view){
   var series = Store.series[w.id] || [];
   var last = series[series.length - 1];
   var prev = series[series.length - 2];
@@ -91,6 +199,7 @@ function watchCard(w){
       sparkline(series.map(function(s){ return s.min_price; })) +
       '<span class="watch-when">' + slotShort(last.slot) + '</span></div>' : "") +
     '</button></div>');
+  swipeToDelete(card, card.querySelector(".trip-open"), w, view);
   ripple(card.querySelector(".trip-open"), function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
   return card;
 }
@@ -282,8 +391,8 @@ function askRow(l, mark, dead){
     '<span class="ask-mark">' + mark +
       (l.n > 1 ? '<span class="badge">중개 ' + l.n + '곳</span>' : '') + '</span>';
   return el(url
-    ? '<a class="ask" href="' + esc(url) + '" target="_blank" rel="noopener">' + inner + '</a>'
-    : '<div class="ask">' + inner + '</div>');
+    ? '<a class="askrow" href="' + esc(url) + '" target="_blank" rel="noopener">' + inner + '</a>'
+    : '<div class="askrow">' + inner + '</div>');
 }
 
 /* 실거래를 볼 기간. 고른 것은 화면을 옮겨도 그대로다 */
@@ -391,13 +500,13 @@ function removeFoot(w){
     ripple(relink, function(){ openNaverLink(w); });
     foot.appendChild(relink);
   }
-  var off = el('<button class="linkbtn danger" type="button">' + icon("trash") + '관심 해제</button>');
+  var off = el('<button class="linkbtn danger" type="button">' + icon("trash") + '삭제</button>');
   ripple(off, function(){
     askThenDelete(w.complex_name + " " + w.room_label, function(){
-      Store.post({ remove: w.id }).then(function(){ return nav.reload(); })
-        .catch(function(e){ toast("해제하지 못했습니다 — " + e.message, true); });
+      /* 목록으로 나가고, 되돌리면 목록에 다시 선다 */
+      var undo = removeWatch(Store.watch(w.id) || w, function(){ nav.reload(); });
       nav.go("/");
-      return null;
+      return undo;
     });
   });
   foot.appendChild(off);
@@ -409,15 +518,21 @@ function openNaverLink(w){
   openTextDialog({
     title: "네이버 부동산 연결",
     value: w.naver_id ? naverComplexUrl(w.naver_id) : "",
-    placeholder: "https://new.land.naver.com/complexes/…",
+    placeholder: "https://fin.land.naver.com/complexes/…",
     hint: "네이버 부동산에서 이 단지를 열고 주소를 붙여넣어 주세요. 단지 번호만 적어도 됩니다.",
     okLabel: "연결"
   }, function(value){
     Store.post({ link: { complexId: w.complex_id, naver: value } }).then(function(data){
       if (!data) return;
       var bad = data.first && (data.first.failed || []).filter(function(f){ return /네이버/.test(f.source || ""); })[0];
+      var was = w.naver_id || "";
       if (bad) toast("연결했습니다. 다만 지금은 네이버 매물을 받지 못했습니다 — " + bad.error, true);
-      else toastDone("네이버 부동산을 연결했습니다.");
+      else if (was === data.naverId) toastDone("네이버 부동산을 연결했습니다.");
+      else toastUndo("네이버 연결을 수정했습니다.", function(){
+        Store.post({ link: { complexId: w.complex_id, naver: was } }).then(function(){
+          toastDone("되돌렸습니다."); nav.reload();
+        }).catch(function(e){ toast("되돌리지 못했습니다 — " + e.message, true); });
+      }, "edit");
       nav.reload();
     }).catch(function(e){ toast("연결하지 못했습니다 — " + e.message, true); });
     return null;

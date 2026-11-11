@@ -154,8 +154,8 @@
 .slotrow .chip{ font-variant-numeric: tabular-nums; }
 
 /* ---------- the 호가 list ---------- */
-.ask{ display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
-.card-head + .ask{ border-top: none; padding-top: 6px; }
+.askrow{ display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+.card-head + .askrow{ border-top: none; padding-top: 6px; }
 .ask-price{
   flex: 0 0 auto; min-width: 86px;
   font-size: 15px; font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums;
@@ -208,9 +208,9 @@
 .outlink .icon{ width: 11px; height: 11px; }
 .outlink:hover{ color: var(--signal); border-color: var(--signal); }
 .outlink:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
-a.ask{ color: inherit; text-decoration: none; }
-a.ask:hover .ask-body b{ color: var(--signal); }
-a.ask:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 6px; }
+a.askrow{ color: inherit; text-decoration: none; }
+a.askrow:hover .ask-body b{ color: var(--signal); }
+a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 6px; }
 .ask-body b{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .badge.src{ font-size: 10px; font-weight: 700; padding: 2px 6px; background: color-mix(in srgb, currentColor 14%, transparent); }
 .badge.src.zigbang{ color: var(--c-food); }
@@ -255,3 +255,42 @@ a.ask:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; bord
 .watch-price.deal .lbl{ color: var(--chart-deal); }
 .watch-foot .spark{ width: 64px; height: 22px; margin-left: auto; }
 .watch-foot .spark + .watch-when{ margin-left: 0; }
+
+/* ---------- 밀어서 삭제 ---------- */
+/* 카드(또는 줄)의 면이 왼쪽으로 밀리면 그 뒤의 삭제 단추가 드러난다 */
+.trip-card, .dense-row{ touch-action: pan-y; }
+.trip-card .trip-open, .dense-open{ background: var(--surface); }
+.swipe-del{
+  position: absolute; top: 0; right: 0; bottom: 0; width: 84px; z-index: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: none; cursor: pointer; visibility: hidden;
+  background: var(--danger); color: var(--surface);
+  font: inherit; font-size: 12px; font-weight: 700;
+}
+.swipe-del .icon{ width: 19px; height: 19px; }
+.swiped > .swipe-del{ visibility: visible; }
+.swipe-del:focus-visible{ outline: 2px solid var(--ink); outline-offset: -4px; }
+.trip-card.swiped .trip-open{ border-radius: 22px 0 0 22px; }
+
+/* ---------- 간단히 보기 ---------- */
+.dense-list{ overflow: hidden; }
+.dense-row{ position: relative; overflow: hidden; border-top: 1px solid var(--line); }
+.dense-row:first-child{ border-top: none; }
+.dense-open{
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 16px; border: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.dense-open:focus-visible{ outline: 2px solid var(--signal); outline-offset: -2px; }
+.dense-id{ flex: 1; min-width: 0; }
+.dense-id b{
+  display: block; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dense-id small, .dense-num small{
+  display: block; margin-top: 1px; font-size: 11.5px; color: var(--ink-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
+}
+.dense-num{ flex-shrink: 0; text-align: right; }
+.dense-num b{ display: block; font-size: 15.5px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.dense-num small .chg{ font-size: 11.5px; }

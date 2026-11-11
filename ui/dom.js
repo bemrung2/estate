@@ -19,6 +19,8 @@ export var ICONS = {
   back: '<polyline points="14 5 7 12 14 19"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   go: '<polyline points="10 5 17 12 10 19"/>',
+  rows: '<line x1="5" y1="7" x2="19" y2="7"/><line x1="5" y1="12" x2="19" y2="12"/><line x1="5" y1="17" x2="19" y2="17"/>',
+  cards: '<rect x="4.5" y="4.5" width="15" height="6.2" rx="1.8"/><rect x="4.5" y="13.3" width="15" height="6.2" rx="1.8"/>',
   out: '<path d="M9 5H5v14h14v-4"/><polyline points="13 5 19 5 19 11"/><line x1="19" y1="5" x2="11" y2="13"/>',
   check: '<polyline points="5 12.5 10 17 19 7"/>',
   undo: '<polyline points="9 14 4 9 9 4"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',

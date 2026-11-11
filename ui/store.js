@@ -30,12 +30,52 @@ export var Store = {
       }
       this.state = "ok";
       this.deals = !!data.deals;
-      this.watches = data.watches || [];
+      var hidden = this._hidden;
+      this.watches = (data.watches || []).filter(function(w){ return !hidden[w.id]; });
       this.series = data.series || {};
     }catch(e){
       this.state = "down";
       this.message = "";
     }
+  },
+
+  /* 삭제는 되돌릴 수 있는 몇 초가 지난 뒤에야 서버로 간다. 그동안은 화면에서만 사라져
+     있고, 되돌리면 아무 일도 없었던 것이 된다 — 기록까지 지워지는 일이라 그렇게 한다. */
+  _hidden: {},
+  _gone: {},
+  removeSoon(w, ms, onDone){
+    var self = this;
+    this._hidden[w.id] = true;
+    var at = this.watches.indexOf(w);
+    this.watches = this.watches.filter(function(x){ return x.id !== w.id; });
+    function send(){
+      if (!self._gone[w.id]) return;
+      delete self._gone[w.id];
+      window.removeEventListener("pagehide", send);
+      fetch("api/watch", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ remove: w.id }), keepalive: true
+      }).then(function(res){
+        delete self._hidden[w.id];
+        if (!res.ok) throw new Error("오류 " + res.status);
+      }).catch(function(e){
+        delete self._hidden[w.id];
+        toast("삭제하지 못했습니다 — " + e.message, true);
+        if (onDone) onDone();
+      });
+    }
+    this._gone[w.id] = setTimeout(send, ms);
+    window.addEventListener("pagehide", send);      /* 창을 닫아도 삭제는 간다 */
+    /* 되돌리기 */
+    return function(){
+      if (!self._gone[w.id]) return;
+      clearTimeout(self._gone[w.id]);
+      delete self._gone[w.id];
+      delete self._hidden[w.id];
+      window.removeEventListener("pagehide", send);
+      self.watches.splice(Math.max(0, Math.min(at, self.watches.length)), 0, w);
+      if (onDone) onDone();
+    };
   },
 
   watch(id){ return this.watches.filter(function(w){ return w.id === id; })[0] || null; },
