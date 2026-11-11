@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
     zigbang: z,
     naver: n,
     naver_raw_first_item: raw.ok ? raw.item : raw.error,
-    deals_key: molit.enabled() ? "있음" : "MOLIT_SERVICE_KEY 없음",
+    deals_key: molit.enabled() ? molit.keyShape() : "MOLIT_SERVICE_KEY 없음",
     deals
   });
 };

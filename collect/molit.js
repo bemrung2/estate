@@ -20,7 +20,16 @@ const PATH = {
 const MONTHS = 3;
 const KEEP = 200;
 
-function key() { return process.env.MOLIT_SERVICE_KEY || ""; }
+/* 붙여넣다 딸려 온 따옴표와 빈칸은 떼어낸다 */
+function key() { return String(process.env.MOLIT_SERVICE_KEY || "").trim().replace(/^["']+|["']+$/g, "").trim(); }
+
+/* 키 자체는 보이지 않게, 모양만 — 잘못 붙여넣었는지 볼 때 (api/probe.js) */
+function keyShape() {
+  const raw = String(process.env.MOLIT_SERVICE_KEY || ""), k = key();
+  if (!k) return "없음";
+  return "길이 " + k.length + (/%[0-9A-Fa-f]{2}/.test(k) ? " · Encoding 꼴" : " · Decoding 꼴") +
+    (raw !== k ? " · 앞뒤에 빈칸이나 따옴표가 있어 떼어냄" : "") + (/\s/.test(k) ? " · 가운데 빈칸 있음(잘못 붙여넣음)" : "");
+}
 
 const num = (v) => Number(String(v == null ? "" : v).replace(/[,\s]/g, "")) || 0;
 const pad = (n) => String(n).padStart(2, "0");
@@ -200,4 +209,4 @@ function merge(old, fresh) {
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, KEEP);
 }
 
-module.exports = { enabled: () => !!key(), deals, diagnose, merge, months, parse, norm };
+module.exports = { enabled: () => !!key(), keyShape, deals, diagnose, merge, months, parse, norm };
