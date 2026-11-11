@@ -6,14 +6,22 @@ on:
 jobs:
   hogangnono:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
       - name: bundle
         run: |
           curl -sS -m 30 "https://hogangnono.com/search?q=x" -o page.html
           JS=$(grep -o 'https://static.hogangnono.com/dist/[^"]*desktop.js' page.html | head -1)
-          echo "bundle $JS"
-          curl -sS -m 60 --compressed "$JS" -o b.js; wc -c b.js; file b.js; head -c 200 b.js; echo
-          echo "--- api-ish"; grep -oE '[a-zA-Z0-9_./-]*api/v?[0-9]*/?[a-zA-Z0-9_./${}-]*' b.js | sort | uniq -c | sort -rn | head -60
-          echo "--- search"; grep -oE '.{0,70}(searches|/search|autocomplete|suggest)[^,;]{0,90}' b.js | sort -u | head -40
-          echo "--- apt"; grep -oE '.{0,50}"?/apt/[^,;]{0,70}' b.js | sort -u | head -25
-          echo "--- try"; for u in "api/v2/searches/keyword?query=%ED%97%AC%EB%A6%AC%EC%98%A4%EC%8B%9C%ED%8B%B0" "api/v2/searches?keyword=%ED%97%AC%EB%A6%AC%EC%98%A4%EC%8B%9C%ED%8B%B0"; do curl -sS -m 15 "https://hogangnono.com/$u" | head -c 400; echo; done
+          curl -sS -m 60 --compressed "$JS" -o b.js; wc -c b.js
+          node -e '
+          const s = require("fs").readFileSync("b.js", "utf8");
+          const seen = new Set();
+          for (const m of s.matchAll(/["\x27`]([^"\x27`\\\n]{3,140})["\x27`]/g)) {
+            const t = m[1];
+            if (/^\/?(api\/|apt\/|search)|\/api\/v\d|searches|autocomplete|\/apt\//.test(t)) seen.add(t);
+          }
+          console.log([...seen].sort().slice(0, 220).join("\n"));
+          for (const k of ["searches", "autocomplete", "/search"]) {
+            let i = -1, n = 0;
+            while ((i = s.indexOf(k, i + 1)) >= 0 && n++ < 6) console.log("@" + k, JSON.stringify(s.slice(Math.max(0, i - 110), i + 130)));
+          }'
