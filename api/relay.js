@@ -22,11 +22,24 @@ const naver = require("../collect/naver.js");
 const PAGES = 5;      /* 단지 · 거래마다 100건까지. 가격순이라 싼 것부터 담긴다 */
 
 module.exports = async function handler(req, res) {
-  const secret = process.env.CRON_SECRET || "";
+  const secret = (process.env.CRON_SECRET || "").trim();
   const url = new URL(req.url, "http://x");
-  const given = url.searchParams.get("key") || (req.headers.authorization || "").replace(/^Bearer /, "");
+  /* 열쇠를 주소창에 그대로 붙여넣으면 '+'가 빈칸으로, '%'가 엉뚱하게 읽힌다(base64로 만든
+     열쇠에 흔하다). 주소에 적힌 그대로도, 풀어 읽은 것도 받아준다. */
+  const raw = ((req.url.split("?")[1] || "").split("&").find((kv) => kv.indexOf("key=") === 0) || "").slice(4);
+  let unescaped = raw;
+  try { unescaped = decodeURIComponent(raw); } catch (e) { /* 그대로 둔다 */ }
+  const tries = [raw, unescaped, url.searchParams.get("key") || "",
+    (req.headers.authorization || "").replace(/^Bearer /, "")].map((k) => k.trim());
+  const given = tries.indexOf(secret) >= 0 ? secret : "";
   if (!secret) return lib.json(res, 200, { ok: false, error: "setup", message: "CRON_SECRET 환경변수가 없습니다." });
-  if (given !== secret) return lib.json(res, 401, { ok: false, error: "key" });
+  if (given !== secret) {
+    return lib.json(res, 401, {
+      ok: false, error: "key",
+      message: "열쇠가 맞지 않습니다. 주소의 key= 뒤에 Vercel 환경변수 CRON_SECRET의 값을 그대로 넣어 주세요 " +
+        "(<CRON_SECRET>이라는 글자가 아니라 그 값)."
+    });
+  }
 
   const home = open();
   if (home.missing.length) return lib.setupError(res, home.missing);

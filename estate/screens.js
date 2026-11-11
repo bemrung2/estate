@@ -82,10 +82,13 @@ function watchCard(w){
       (last && last.min_price != null
         ? '<b>' + won(last.min_price) + '</b>'
         : '<b class="none">' + (last ? "매물 없음" : "아직 기록이 없습니다") + '</b>') +
-      (deal ? '<span class="watch-deal">최근 실거래 <b>' + won(deal.price) + '</b> · ' + dayShort(deal.date) + '</span>' : '') +
-    '</div>' + sparkline(series.map(function(s){ return s.min_price; })) + '</div>' +
+    '</div>' +
+    /* 호가와 실거래를 같은 크기로 나란히 — 둘을 견주는 것이 이 카드의 일이다 */
+    (deal ? '<div class="watch-price deal"><span class="lbl">최근 실거래 · ' + dayShort(deal.date) + '</span>' +
+      '<b>' + won(deal.price) + '</b></div>' : '') + '</div>' +
     (last ? '<div class="watch-foot"><span>매물 <b>' + last.count + '</b>건</span>' +
       (prev ? chg(last.min_price, prev.min_price) : "") +
+      sparkline(series.map(function(s){ return s.min_price; })) +
       '<span class="watch-when">' + slotShort(last.slot) + '</span></div>' : "") +
     '</button></div>');
   ripple(card.querySelector(".trip-open"), function(){ nav.go("/w/" + encodeURIComponent(w.id)); });

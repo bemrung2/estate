@@ -248,3 +248,10 @@ a.ask:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; bord
 .deal-count b{ color: var(--ink); font-weight: 700; }
 .deal-count + .deal-month{ margin-top: 8px; }
 .deal-more{ width: 100%; margin: 12px 0 0; font-size: 13px; padding: 11px 14px; }
+/* 목록 카드: 최저 호가와 최근 실거래가 같은 글씨로 나란히 선다. 추이선은 아랫줄로 내려간다 */
+.watch-mid{ align-items: flex-start; gap: 14px; }
+.watch-price{ flex: 1 1 0; }
+.watch-price b{ font-size: clamp(19px, 6.2vw, 25px); white-space: nowrap; }
+.watch-price.deal .lbl{ color: var(--chart-deal); }
+.watch-foot .spark{ width: 64px; height: 22px; margin-left: auto; }
+.watch-foot .spark + .watch-when{ margin-left: 0; }
