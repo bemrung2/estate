@@ -12,7 +12,7 @@ jobs:
           curl -sS -m 30 "https://hogangnono.com/search?q=x" -o page.html
           JS=$(grep -o 'https://static.hogangnono.com/dist/[^"]*desktop.js' page.html | head -1)
           echo "bundle $JS"
-          curl -sS -m 60 "$JS" -o b.js; wc -c b.js
+          curl -sS -m 60 --compressed "$JS" -o b.js; wc -c b.js; file b.js; head -c 200 b.js; echo
           echo "--- api-ish"; grep -oE '[a-zA-Z0-9_./-]*api/v?[0-9]*/?[a-zA-Z0-9_./${}-]*' b.js | sort | uniq -c | sort -rn | head -60
           echo "--- search"; grep -oE '.{0,70}(searches|/search|autocomplete|suggest)[^,;]{0,90}' b.js | sort -u | head -40
           echo "--- apt"; grep -oE '.{0,50}"?/apt/[^,;]{0,70}' b.js | sort -u | head -25
