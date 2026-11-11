@@ -18,6 +18,7 @@ const lib = require("./_core.js");
 const { open } = require("./_data.js");
 const { absorbNaver } = require("../collect/run.js");
 const naver = require("../collect/naver.js");
+const zigbang = require("../collect/zigbang.js");
 
 const PAGES = 5;      /* 단지 · 거래마다 100건까지. 가격순이라 싼 것부터 담긴다 */
 
@@ -45,13 +46,18 @@ module.exports = async function handler(req, res) {
   if (home.missing.length) return lib.setupError(res, home.missing);
   try {
     if (req.method === "GET") {
-      const seen = {}, urls = [];
-      ((await home.data.watches()) || []).forEach((w) => {
+      const seen = {}, urls = [], dong = {};
+      for (const w of (await home.data.watches()) || []) {
         const k = w.naver_id + "|" + w.trade;
-        if (!w.naver_id || seen[k]) return;
+        if (!w.naver_id || seen[k]) continue;
         seen[k] = true;
-        for (let n = 1; n <= PAGES; n++) urls.push(naver.pageUrl(w.naver_id, w.trade, n));
-      });
+        /* 네이버는 단지 번호와 함께 법정동 코드를 받는다 */
+        if (!(w.complex_id in dong)) {
+          try { dong[w.complex_id] = (await zigbang.place(w.complex_id)).bcode; }
+          catch (e) { dong[w.complex_id] = ""; }
+        }
+        for (let n = 1; n <= PAGES; n++) urls.push(naver.pageUrl(w.naver_id, w.trade, n, dong[w.complex_id]));
+      }
       return lib.json(res, 200, { ok: true, urls });
     }
     if (req.method === "POST") {

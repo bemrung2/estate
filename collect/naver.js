@@ -55,9 +55,11 @@ async function find(name) {
   return complexNo(res.headers.get("location") || "");
 }
 
-/* 매물 목록 한 쪽의 주소 */
-function pageUrl(complexId, trade, n) {
+/* 매물 목록 한 쪽의 주소. cortarNo는 그 단지의 법정동 코드(10자리) — 이것 없이 부르면
+   네이버는 "null"만 돌려준다 (실제로 그렇게 돌아왔다). */
+function pageUrl(complexId, trade, n, cortarNo) {
   return BASE + "/complex/getComplexArticleList?hscpNo=" + encodeURIComponent(complexId) +
+    (cortarNo ? "&cortarNo=" + encodeURIComponent(cortarNo) : "") +
     "&tradTpCd=" + CODE[trade] + "&order=prc&showR0=N&page=" + n;
 }
 
@@ -74,9 +76,10 @@ function parsePage(data) {
     try { data = JSON.parse(data); }
     catch (e) { throw new Error("naver: JSON이 아닌 답 (" + data.slice(0, 60).replace(/\s+/g, " ") + ")"); }
   }
-  const result = (data && data.result) || {};
-  const list = Array.isArray(result.list) ? result.list : [];
+  if (data === null) throw new Error("naver: 빈 답(null) — 주소의 조건이 맞지 않습니다");
   if (!data || !data.result) throw new Error("naver: 뜻밖의 답");
+  const result = data.result;
+  const list = Array.isArray(result.list) ? result.list : [];
   const listings = [];
   list.forEach((it) => {
     const id = String(it.atclNo || "");
