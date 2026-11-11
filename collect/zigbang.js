@@ -12,7 +12,7 @@ const PAGE = 200;
 const TRADES = { trade: "매매", charter: "전세" };
 
 async function get(path) {
-  const res = await fetch(BASE + path, { headers: { accept: "application/json" } });
+  const res = await fetch(BASE + path, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error("zigbang " + res.status + " " + path.split("?")[0]);
   return res.json();
 }
@@ -74,4 +74,9 @@ async function roomTypes(complexId, trade) {
     .sort((a, b) => parseFloat(a.label) - parseFloat(b.label) || (a.label < b.label ? -1 : 1));
 }
 
-module.exports = { key: "zigbang", name: "직방", TRADES, search, catalog, roomTypes };
+module.exports = {
+  key: "zigbang", name: "직방", TRADES,
+  /* 등록 창이 무엇을 물을지 */
+  ask: { label: "단지 이름", placeholder: "예: 헬리오시티" },
+  search, catalog, roomTypes
+};

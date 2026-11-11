@@ -1,7 +1,7 @@
 /*
  * The watch list and what was recorded for it.
  *
- *   GET  /api/watch                 -> { ok, me, canWrite, canSignIn, sources, watches, series }
+ *   GET  /api/watch                 -> { ok, sources, watches, series }
  *                                      series: { watchId: [summary…] } oldest first
  *   GET  /api/watch?id=W            -> { ok, watch, history }            every snapshot's numbers
  *   GET  /api/watch?id=W&slot=S     -> { ok, snapshot, previous }        the 호가 list of one, and
@@ -10,7 +10,7 @@
  *   POST /api/watch { remove: id }
  */
 const lib = require("./_core.js");
-const { open, asker } = require("./_data.js");
+const { open } = require("./_data.js");
 const { run, SOURCES } = require("../collect/run.js");
 
 const PER_WATCH = 28;      /* two weeks of half-days on the list screen */
@@ -24,7 +24,6 @@ module.exports = async function handler(req, res) {
   const data = home.data;
 
   try {
-    const who = await asker(req, home);
     const url = new URL(req.url, "http://x");
 
     if (req.method === "GET") {
@@ -37,8 +36,8 @@ module.exports = async function handler(req, res) {
           if (list.length < PER_WATCH) list.unshift(s);
         });
         return lib.json(res, 200, {
-          ok: true, me: who.me, canWrite: who.canWrite, canSignIn: who.canSignIn,
-          sources: Object.keys(SOURCES).map((k) => ({ key: k, name: SOURCES[k].name })),
+          ok: true,
+          sources: Object.keys(SOURCES).map((k) => ({ key: k, name: SOURCES[k].name, ask: SOURCES[k].ask })),
           watches: watches || [], series
         });
       }
@@ -64,7 +63,6 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      if (!who.canWrite) return lib.json(res, 403, { ok: false, error: who.me ? "readonly" : "signin" });
       const body = await lib.readBody(req, 16384);
 
       if (body && body.remove) {
@@ -89,8 +87,8 @@ module.exports = async function handler(req, res) {
       let ord = existing.reduce((m, w) => Math.max(m, Number(w.ord) || 0), 0);
       const added = [];
       for (const t of types) {
-        const typeId = clean(t && t.id, 12);
-        if (!/^\d+$/.test(typeId)) return lib.json(res, 400, { ok: false, error: "body" });
+        const typeId = clean(t && t.id, 24);
+        if (!/^[\w.]+$/.test(typeId)) return lib.json(res, 400, { ok: false, error: "body" });
         const id = [source.key, complexId, typeId, add.trade].join("-");
         if (existing.some((w) => w.id === id)) continue;       /* 이미 보고 있는 평형 */
         await data.putWatch({

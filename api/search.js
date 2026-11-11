@@ -4,20 +4,15 @@
  *   GET /api/search?q=헬리오          -> { ok, complexes: [{ id, name, address, households }] }
  *   GET /api/search?complex=38487&trade=trade
  *                                    -> { ok, types: [{ id, label, count }] }
- *
- * Editors only: this spends requests on someone else's server.
  */
 const lib = require("./_core.js");
-const { open, asker } = require("./_data.js");
+const { open } = require("./_data.js");
 const { SOURCES } = require("../collect/run.js");
 
 module.exports = async function handler(req, res) {
   const home = open();
   if (home.missing.length) return lib.setupError(res, home.missing);
   try {
-    const who = await asker(req, home);
-    if (!who.canWrite) return lib.json(res, 403, { ok: false, error: who.me ? "readonly" : "signin" });
-
     const url = new URL(req.url, "http://x");
     const source = SOURCES[url.searchParams.get("source") || "zigbang"];
     if (!source) return lib.json(res, 400, { ok: false, error: "source" });
@@ -30,7 +25,7 @@ module.exports = async function handler(req, res) {
       return lib.json(res, 200, { ok: true, types: await source.roomTypes(complex, trade) });
     }
 
-    const q = (url.searchParams.get("q") || "").trim().slice(0, 40);
+    const q = (url.searchParams.get("q") || "").trim().slice(0, 200);
     if (q.length < 2) return lib.json(res, 200, { ok: true, complexes: [] });
     return lib.json(res, 200, { ok: true, complexes: await source.search(q) });
   } catch (e) {

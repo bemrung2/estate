@@ -1,4 +1,4 @@
-/* BEMSTATE — where the app starts.
+/* BEMESTATE — where the app starts.
  *
  *   ui/       the parts any screen uses: sheets, icons, the store, routing
  *   estate/   the screens: the watch list, and one 단지 · 평형 over time

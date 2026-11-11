@@ -3,7 +3,7 @@
 import { el, esc, icon, ripple, toast, toastDone } from "../ui/dom.js";
 import { Store } from "../ui/store.js";
 import { themeButton } from "../ui/theme.js";
-import { brandMark, accountFooter } from "../ui/shell.js";
+import { brandMark, pageFooter } from "../ui/shell.js";
 import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag } from "../ui/sheet.js";
 import { won, delta, slotLabel, slotShort, floorLabel } from "./format.js";
 import { sparkline, lineChart } from "./chart.js";
@@ -20,6 +20,11 @@ function chg(now, before, unit){
   if (!d) return '<span class="chg">변동 없음</span>';
   return '<span class="chg ' + (d > 0 ? "up" : "down") + '">' + (d > 0 ? "▲ " : "▼ ") +
     (unit === "count" ? Math.abs(d) + "건" : won(Math.abs(d))) + '</span>';
+}
+
+function sourceName(key){
+  var s = Store.sources.filter(function(x){ return x.key === key; })[0];
+  return s ? s.name : key;
 }
 
 function place(address){
@@ -54,10 +59,9 @@ export function renderList(view){
     ripple(add, openAdd);
     list.appendChild(add);
     pad.appendChild(list);
-    pad.appendChild(el('<p class="store-note">매일 00시 · 12시에 기록합니다 · 출처 ' +
-      esc(Store.sources.map(function(s){ return s.name; }).join(" · ")) + '</p>'));
+    pad.appendChild(el('<p class="store-note">매일 00시 · 12시에 기록합니다</p>'));
   }
-  pad.appendChild(accountFooter());
+  pad.appendChild(pageFooter());
   swap(view, pad);
 }
 
@@ -82,7 +86,7 @@ function watchCard(w){
     '</div>' + sparkline(series.map(function(s){ return s.min_price; })) + '</div>' +
     (last ? '<div class="watch-foot"><span>매물 <b>' + last.count + '</b>건</span>' +
       (prev ? chg(last.min_price, prev.min_price) : "") +
-      '<span class="watch-when">' + slotShort(last.slot) + '</span></div>' : "") +
+      '<span class="watch-when">' + esc(sourceName(w.source)) + ' · ' + slotShort(last.slot) + '</span></div>' : "") +
     '</button></div>');
   ripple(card.querySelector(".trip-open"), function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
   return card;
@@ -100,7 +104,8 @@ export function renderWatch(view, id, slot){
     '<div class="hero-id"><h1 class="hero-city">' + esc(w.complex_name) + '</h1></div></div>' +
     '<div class="hero-sub">' + place(w.address) +
       '<span class="watch-type">' + esc(w.room_label) + '</span>' +
-      '<span class="watch-trade">' + TRADE[w.trade] + '</span></div></div>');
+      '<span class="watch-trade">' + TRADE[w.trade] + '</span>' +
+      '<span class="watch-trade">' + esc(sourceName(w.source)) + '</span></div></div>');
   ripple(hero.querySelector(".hero-back"), function(){ nav.go("/"); });
   page.appendChild(hero);
   var body = el('<div><div class="card"><span class="bar bar-s"></span><span class="bar bar-m"></span>' +
@@ -224,7 +229,6 @@ function removeFoot(w){
   var foot = el('<div class="dangerfoot"><button class="linkbtn danger" type="button">' +
     icon("trash") + '관심 해제</button></div>');
   ripple(foot.querySelector("button"), function(){
-    if (!Store.canEdit()) return Store.deny();
     askThenDelete(w.complex_name + " " + w.room_label, function(){
       Store.post({ remove: w.id }).then(function(){ return nav.reload(); })
         .catch(function(e){ toast("해제하지 못했습니다 — " + e.message, true); });
@@ -237,22 +241,28 @@ function removeFoot(w){
 
 /* ---------- adding a watch ---------- */
 function openAdd(){
-  if (!Store.canEdit()) return Store.deny();
-  var sheet = sheetShell("관심 단지 추가", "출처 · " + Store.sources.map(function(s){ return s.name; }).join(" · "));
+  var sheet = sheetShell("관심 단지 추가");
   var body = sheet.querySelector(".sheet-body");
   var foot = sheet.querySelector(".sheet-foot");
   var save = el('<button class="btn btn-primary" type="button">등록</button>');
   foot.appendChild(save);
   foot.hidden = true;
 
-  var chosen = null, trade = "trade", types = [], picked = {};
+  var source = Store.sources[0], chosen = null, trade = "trade", types = [], picked = {};
   var asked = 0;
 
   function stepSearch(){
     chosen = null; foot.hidden = true;
     body.innerHTML = "";
-    var fld = el('<div class="fld"><label for="q">단지 이름</label>' +
-      '<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="예: 헬리오시티"></div>');
+    var src = el('<div class="fld"><label>출처</label><div class="pickrow"></div></div>');
+    pickGroup(src.querySelector(".pickrow"),
+      Store.sources.map(function(x){ return { key: x.key, label: x.name }; }),
+      function(){ return source.key; },
+      function(k){ source = Store.sources.filter(function(x){ return x.key === k; })[0]; stepSearch(); });
+    body.appendChild(src);
+    var fld = el('<div class="fld"><label for="q">' + esc(source.ask.label) + '</label>' +
+      '<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="' +
+      esc(source.ask.placeholder) + '"></div>');
     var out = el('<div></div>');
     body.appendChild(fld);
     body.appendChild(out);
@@ -262,7 +272,7 @@ function openAdd(){
       if (q.length < 2){ out.innerHTML = ""; return; }
       var mine = ++asked;
       out.innerHTML = '<p class="card-empty">찾는 중…</p>';
-      Store.search(q).then(function(data){
+      Store.search(source.key, q).then(function(data){
         if (mine !== asked || !data) return;
         out.innerHTML = "";
         if (!data.complexes.length){
@@ -293,7 +303,7 @@ function openAdd(){
     body.innerHTML = "";
     picked = {};
     var top = el('<div class="chosen"><span class="rowbody"><b>' + esc(chosen.name) + '</b>' +
-      '<small>' + esc(chosen.address) + '</small></span>' +
+      '<small>' + esc(source.name + " · " + chosen.address) + '</small></span>' +
       '<button class="quietbtn" type="button">다시 찾기</button></div>');
     ripple(top.querySelector("button"), stepSearch);
     body.appendChild(top);
@@ -316,7 +326,7 @@ function openAdd(){
     var mine = ++asked;
     picked = {};
     row.innerHTML = '<p class="card-empty">평형을 불러오는 중…</p>';
-    Store.types(chosen.id, trade).then(function(data){
+    Store.types(source.key, chosen.id, trade).then(function(data){
       if (mine !== asked || !data) return;
       types = data.types;
       row.innerHTML = "";
@@ -345,7 +355,7 @@ function openAdd(){
     save.disabled = true;
     save.textContent = "등록하는 중…";
     Store.post({ add: {
-      source: Store.sources[0].key, complexId: chosen.id, complexName: chosen.name,
+      source: source.key, complexId: chosen.id, complexName: chosen.name,
       address: chosen.address, trade: trade,
       types: want.map(function(t){ return { id: t.id, label: t.label }; })
     } }).then(function(data){

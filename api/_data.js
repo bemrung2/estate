@@ -80,28 +80,11 @@ function file(path) {
   };
 }
 
-/* { data, cfg, missing } — `missing` names the settings that keep it shut */
+/* { data, missing } — `missing` names the settings that keep it shut */
 function open() {
+  if (process.env.ESTATE_FILE_DB) return { data: file(process.env.ESTATE_FILE_DB), missing: [] };
   const cfg = lib.env();
-  if (process.env.ESTATE_FILE_DB) return { data: file(process.env.ESTATE_FILE_DB), cfg, missing: [] };
-  const missing = cfg.missing.filter((name) => name.indexOf("SUPABASE") === 0);
-  return { data: missing.length ? null : supabase(cfg), cfg, missing };
+  return { data: cfg.missing.length ? null : supabase(cfg), missing: cfg.missing };
 }
 
-/* Who is asking, and may they change the list. Reading is open; writing takes
-   a signed-in editor unless EDIT_OPEN=1 (see api/_core.js). */
-async function asker(req, home) {
-  let row = null;
-  if (home.cfg.secret && home.data && home.data.kind === "supabase") {
-    const who = lib.session(req, home.cfg.secret);
-    if (who) row = await lib.member(lib.db(home.cfg), who.id);
-  }
-  return {
-    me: row ? { name: row.name, avatar: row.avatar, canEdit: lib.isEditor(row), isOwner: lib.isOwner(row) } : null,
-    canWrite: lib.editOpen() ? true : lib.isEditor(row),
-    /* 로그인 자체가 아직 설정되지 않았으면 화면이 로그인 단추를 내밀지 않는다 */
-    canSignIn: !!(home.cfg.kakaoKey && home.cfg.secret && home.data && home.data.kind === "supabase")
-  };
-}
-
-module.exports = { open, asker };
+module.exports = { open };

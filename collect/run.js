@@ -5,7 +5,7 @@
  * It is safe to run twice — a snapshot is keyed by (watch, slot), so a second
  * run in the same half-day replaces the first rather than adding to it.
  */
-const SOURCES = { zigbang: require("./zigbang.js") };
+const SOURCES = { zigbang: require("./zigbang.js"), naver: require("./naver.js") };
 
 const KST = 9 * 3600 * 1000;
 
@@ -64,7 +64,7 @@ async function run(data, opts) {
       for (const w of group) {
         const listings = cat.listings
           .filter((l) => l.type === w.room_type_id)
-          .map(({ type, ...rest }) => rest)
+          .map(({ type, complexName, ...rest }) => rest)
           .sort((a, b) => a.price - b.price);
         await data.putSnapshot({ watch_id: w.id, slot, taken_at: taken, ...stats(listings), listings });
         report.saved++;
