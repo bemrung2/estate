@@ -53,7 +53,9 @@ async function fetchGroup(group) {
     state.zigbang = "fail";
     failed.push({ complex: head.complex_name, source: "직방", error: why(e) });
   }
-  const naverId = (group.find((w) => w.naver_id) || {}).naver_id;
+  /* 네이버는 서버에서 직접 받지 않는다: 클라우드 서버의 연결을 받지 않고, 예전 목록 주소는
+     이제 null만 준다. NAVER_DIRECT=1 일 때만 시도한다 (받아주는 곳에서 시험할 때). */
+  const naverId = process.env.NAVER_DIRECT === "1" ? (group.find((w) => w.naver_id) || {}).naver_id : "";
   if (naverId) {
     try {
       got.naver = (await naver.catalog(naverId, head.trade)).listings;

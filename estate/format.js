@@ -45,7 +45,7 @@ export var PLATFORM = { zigbang: "직방", naver: "네이버" };
 
 /* 매물 하나의 원래 화면 */
 export function listingUrl(l){
-  if (l.src === "naver") return "https://m.land.naver.com/article/info/" + encodeURIComponent(l.item || l.id);
+  if (l.src === "naver") return "https://fin.land.naver.com/articles/" + encodeURIComponent(l.item || l.id);
   if (l.item) return "https://www.zigbang.com/home/apt/items/" + encodeURIComponent(l.item);
   return "";
 }
@@ -57,7 +57,7 @@ export function hogangnonoUrl(w){
 }
 
 export function naverComplexUrl(id){
-  return "https://new.land.naver.com/complexes/" + encodeURIComponent(id);
+  return "https://fin.land.naver.com/complexes/" + encodeURIComponent(id) + "?tab=article";
 }
 
 /* 번호를 모를 때: 네이버 부동산에서 그 이름을 찾은 화면 */
