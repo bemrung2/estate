@@ -13,6 +13,7 @@ jobs:
           JS=$(grep -o 'https://static.hogangnono.com/dist/[^"]*desktop.js' page.html | head -1)
           echo "bundle $JS"
           curl -sS -m 60 "$JS" -o b.js; wc -c b.js
-          echo "--- api paths"; grep -o '"/api/[A-Za-z0-9/_${}.:?=&-]*"' b.js | sort -u | head -150
-          echo "--- search-ish"; grep -o '.\{80\}search.\{120\}' b.js | grep -i "api\|query\|keyword" | head -25
-          echo "--- apt url"; grep -o '.\{60\}"/apt/.\{80\}' b.js | head -10
+          echo "--- api-ish"; grep -oE '[a-zA-Z0-9_./-]*api/v?[0-9]*/?[a-zA-Z0-9_./${}-]*' b.js | sort | uniq -c | sort -rn | head -60
+          echo "--- search"; grep -oE '.{0,70}(searches|/search|autocomplete|suggest)[^,;]{0,90}' b.js | sort -u | head -40
+          echo "--- apt"; grep -oE '.{0,50}"?/apt/[^,;]{0,70}' b.js | sort -u | head -25
+          echo "--- try"; for u in "api/v2/searches/keyword?query=%ED%97%AC%EB%A6%AC%EC%98%A4%EC%8B%9C%ED%8B%B0" "api/v2/searches?keyword=%ED%97%AC%EB%A6%AC%EC%98%A4%EC%8B%9C%ED%8B%B0"; do curl -sS -m 15 "https://hogangnono.com/$u" | head -c 400; echo; done
