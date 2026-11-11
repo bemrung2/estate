@@ -8,8 +8,9 @@
  * 한 번의 요청은 시군구 하나의 한 달치다. 단지는 법정동 + 지번으로, 평형은 전용
  * 면적으로 가려낸다.
  *
- * !! 주소는 응답을 확인했지만(키 없이 부르면 "SERVICE_KEY_IS_NULL"), 키가 없어 실제
- * 거래 목록은 받아보지 못했다. 필드 이름은 공개 명세를 따랐다.
+ * !! 주소와 오류 답은 확인했지만(키가 틀리면 "등록되지 않은 서비스키"), 만든 쪽에는 키가
+ * 없어 실제 거래 목록은 받아보지 못했다. 그래서 답이 JSON이든 XML이든, 이름이 영문이든
+ * 한글이든 읽도록 해 두었고, /api/probe 가 어디서 걸러지는지 단계별로 보여준다.
  */
 const BASE = "https://apis.data.go.kr/1613000/";
 const PATH = {
@@ -35,26 +36,75 @@ function months(now) {
   return out;
 }
 
+/* 인증키는 두 가지로 나눠 준다: 그대로인 것(Decoding)과 주소에 넣게 바꿔 둔 것(Encoding).
+   어느 쪽을 넣어도 되게 한다 — 이미 바뀐 것을 또 바꾸면 '등록되지 않은 키'가 된다. */
+function keyParam() {
+  const k = key().trim();
+  return /%[0-9A-Fa-f]{2}/.test(k) ? k : encodeURIComponent(k);
+}
+
+/* 이 API는 판마다 이름이 달랐다(영문 · 한글). 어느 쪽으로 와도 같은 모양으로 읽는다. */
+const NAMES = {
+  aptNm: ["aptNm", "아파트"], umdNm: ["umdNm", "법정동"], jibun: ["jibun", "지번"],
+  excluUseAr: ["excluUseAr", "전용면적"], floor: ["floor", "층"],
+  dealYear: ["dealYear", "년"], dealMonth: ["dealMonth", "월"], dealDay: ["dealDay", "일"],
+  dealAmount: ["dealAmount", "거래금액"], deposit: ["deposit", "보증금액", "보증금"],
+  monthlyRent: ["monthlyRent", "월세금액", "월세"], cdealType: ["cdealType", "해제여부"]
+};
+function norm(it) {
+  const out = {};
+  Object.keys(NAMES).forEach((k) => {
+    const name = NAMES[k].find((n) => it[n] != null);
+    out[k] = name == null ? "" : String(it[name]).trim();
+  });
+  return out;
+}
+
+/* 답은 JSON으로도 XML로도 온다. 오류도 그렇다. → { items, total } 또는 던진다 */
+function parse(text, status) {
+  const t = String(text || "").trim();
+  if (t[0] === "{") {
+    let data;
+    try { data = JSON.parse(t); } catch (e) { throw new Error("실거래가 API: 읽을 수 없는 답"); }
+    const bad = data.OpenAPI_ServiceResponse && data.OpenAPI_ServiceResponse.cmmMsgHeader;
+    if (bad) throw new Error("실거래가 API: " + (bad.returnAuthMsg || bad.errMsg || "오류"));
+    const head = (data.response && data.response.header) || {};
+    if (!data.response) throw new Error("실거래가 API: 뜻밖의 답 (" + t.slice(0, 80) + ")");
+    if (head.resultCode != null && !/^0+$/.test(String(head.resultCode))) {
+      throw new Error("실거래가 API: " + (head.resultMsg || head.resultCode));
+    }
+    const body = data.response.body || {};
+    let items = (body.items && body.items.item) || [];
+    if (!Array.isArray(items)) items = [items];
+    return { items, total: num(body.totalCount) };
+  }
+  if (t[0] === "<") {
+    const tag = (name) => (t.match(new RegExp("<" + name + ">([^<]*)</" + name + ">")) || [])[1];
+    const auth = tag("returnAuthMsg") || tag("errMsg");
+    if (auth) throw new Error("실거래가 API: " + auth);
+    const code = tag("resultCode");
+    if (code != null && !/^0+$/.test(code)) throw new Error("실거래가 API: " + (tag("resultMsg") || code));
+    const items = (t.match(/<item>[\s\S]*?<\/item>/g) || []).map((block) => {
+      const it = {};
+      block.replace(/<([^\/>\s]+)>([^<]*)<\/\1>/g, (m, k, v) => { it[k] = v; return m; });
+      return it;
+    });
+    return { items, total: num(tag("totalCount")) };
+  }
+  throw new Error("실거래가 API: HTTP " + status);
+}
+
 async function month(trade, lawd, ym) {
   const rows = [];
   for (let page = 1; page <= 10; page++) {
-    const url = BASE + PATH[trade] + "?serviceKey=" + encodeURIComponent(key()) +
+    const url = BASE + PATH[trade] + "?serviceKey=" + keyParam() +
       "&LAWD_CD=" + lawd + "&DEAL_YMD=" + ym + "&numOfRows=1000&pageNo=" + page + "&_type=json";
-    const res = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15000) });
-    const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); }
-    catch (e) {
-      const why = (text.match(/<returnAuthMsg>([^<]*)/) || text.match(/<errMsg>([^<]*)/) || [])[1];
-      throw new Error("실거래가 API: " + (why || "HTTP " + res.status));
-    }
-    const body = (data.response && data.response.body) || {};
-    const head = (data.response && data.response.header) || {};
-    if (head.resultCode && !/^0+$/.test(String(head.resultCode))) throw new Error("실거래가 API: " + head.resultMsg);
-    let items = (body.items && body.items.item) || [];
-    if (!Array.isArray(items)) items = [items];
-    items.forEach((it) => rows.push(it));
-    if (rows.length >= num(body.totalCount) || !items.length) break;
+    let res;
+    try { res = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15000) }); }
+    catch (e) { throw new Error("실거래가 API에 닿지 못했습니다"); }
+    const got = parse(await res.text(), res.status);
+    got.items.forEach((it) => rows.push(norm(it)));
+    if (rows.length >= got.total || !got.items.length) break;
   }
   return rows;
 }
@@ -67,13 +117,36 @@ function deal(trade, it) {
   if (trade === "charter" && num(it.monthlyRent) > 0) return null;      /* 월세는 전세가 아니다 */
   const date = it.dealYear + "-" + pad(it.dealMonth) + "-" + pad(it.dealDay);
   const price = num(trade === "trade" ? it.dealAmount : it.deposit);
-  if (!price) return null;
-  const floor = String(it.floor == null ? "" : it.floor).trim();
+  if (!price || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   return {
-    id: [date, floor, price].join("/"),
-    date, price, floor,
-    canceled: !!String(it.cdealType || "").trim()
+    id: [date, it.floor, price].join("/"),
+    date, price, floor: it.floor,
+    canceled: !!it.cdealType
   };
+}
+
+/* 그 구의 거래 가운데 이 단지의 것. 지번이 맞는 것이 단지다 — 지번으로 하나도 안 잡히면
+   (지번 표기가 다르거나 모를 때) 이름이 같은 것으로 잡는다. */
+function ofComplex(rows, head) {
+  const byLot = head.jibun ? rows.filter((it) =>
+    plain(it.umdNm) === plain(head.dong_name) && lot(it.jibun) === lot(head.jibun)) : [];
+  if (byLot.length) return byLot;
+  const name = plain(head.complex_name);
+  return rows.filter((it) => plain(it.aptNm) === name &&
+    (!head.dong_name || plain(it.umdNm) === plain(head.dong_name)));
+}
+
+const sameArea = (it, w) => Math.abs(num(it.excluUseAr) - Number(w.exclusive_m2)) <= 0.5;
+const newest = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+
+async function rowsFor(head, cache) {
+  const rows = [];
+  for (const ym of months()) {
+    const k = [head.trade, head.lawd_cd, ym].join("|");
+    if (!cache[k]) cache[k] = await month(head.trade, head.lawd_cd, ym);
+    cache[k].forEach((r) => rows.push(r));
+  }
+  return rows;
 }
 
 /*
@@ -84,26 +157,38 @@ function deal(trade, it) {
 async function deals(watches, cache) {
   const head = watches[0];
   if (!key() || !head.lawd_cd || !PATH[head.trade]) return null;
-  const rows = [];
-  for (const ym of months()) {
-    const k = [head.trade, head.lawd_cd, ym].join("|");
-    if (!cache[k]) cache[k] = await month(head.trade, head.lawd_cd, ym);
-    cache[k].forEach((r) => rows.push(r));
-  }
-  /* 지번이 맞는 것이 단지다. 지번을 모르면 이름으로 */
-  const here = rows.filter((it) => head.jibun
-    ? plain(it.umdNm) === plain(head.dong_name) && lot(it.jibun) === lot(head.jibun)
-    : plain(it.aptNm) === plain(head.complex_name));
+  const here = ofComplex(await rowsFor(head, cache), head);
   const out = {};
   watches.forEach((w) => {
-    const own = Number(w.exclusive_m2);
-    if (!own) return;
-    out[w.id] = here
-      .filter((it) => Math.abs(num(it.excluUseAr) - own) <= 0.5)
-      .map((it) => deal(w.trade, it)).filter(Boolean)
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    if (!Number(w.exclusive_m2)) return;
+    out[w.id] = here.filter((it) => sameArea(it, w)).map((it) => deal(w.trade, it)).filter(Boolean).sort(newest);
   });
   return out;
+}
+
+/* 어디서 걸러졌는지 단계별로 센다 — 실거래가 안 보일 때 이유를 찾는 데 쓴다 (api/probe.js) */
+async function diagnose(w, cache) {
+  const out = {
+    watch: w.complex_name + " " + w.room_label, trade: w.trade,
+    lawd_cd: w.lawd_cd || "(없음)", dong: w.dong_name || "(없음)", jibun: w.jibun || "(없음)",
+    exclusive_m2: w.exclusive_m2 || "(없음)"
+  };
+  if (!key()) return { ...out, error: "MOLIT_SERVICE_KEY가 없습니다" };
+  if (!w.lawd_cd) return { ...out, error: "시군구 코드를 아직 모릅니다 — 단지 화면을 한 번 열어 주세요" };
+  try {
+    const rows = await rowsFor(w, cache);
+    const here = ofComplex(rows, w);
+    const mine = here.filter((it) => sameArea(it, w));
+    return {
+      ...out, months: months(),
+      rows_in_district: rows.length,
+      rows_of_complex: here.length,
+      areas_of_complex: [...new Set(here.map((it) => it.excluUseAr))].sort(),
+      rows_of_this_type: mine.length,
+      newest: mine.map((it) => deal(w.trade, it)).filter(Boolean).sort(newest).slice(0, 3),
+      sample_row: rows[0] || null
+    };
+  } catch (e) { return { ...out, error: String(e.message || e) }; }
 }
 
 /* 전에 받아둔 것과 합친다 — 석 달이 지난 거래도 남는다 */
@@ -115,4 +200,4 @@ function merge(old, fresh) {
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, KEEP);
 }
 
-module.exports = { enabled: () => !!key(), deals, merge, months };
+module.exports = { enabled: () => !!key(), deals, diagnose, merge, months, parse, norm };

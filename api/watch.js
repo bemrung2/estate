@@ -65,7 +65,11 @@ module.exports = async function handler(req, res) {
         if (!watch) return lib.json(res, 404, { ok: false, error: "unknown" });
         /* 면적이나 주소를 아직 모르는 관심(예전에 등록한 것)은 열 때 채운다. 그래야
            실거래가를 가려낼 수 있다. 채웠으면 실거래가도 그 자리에서 한 번 받는다. */
-        const fresh = !Number(watch.exclusive_m2) || !watch.lawd_cd || (molit.enabled() && !watch.deals_at);
+        /* 실거래가 비어 있으면 한 시간에 한 번은 다시 받아 본다 — 키를 막 넣었거나 고쳤을 때
+           다음 수집까지 기다리지 않게 */
+        const stale = molit.enabled() && (!watch.deals_at ||
+          (!(watch.deals || []).length && Date.now() - Date.parse(watch.deals_at) > 3600 * 1000));
+        const fresh = !Number(watch.exclusive_m2) || !watch.lawd_cd || stale;
         if (fresh || !watch.hgnn_id) {
           try {
             const group = await ensure(data, watches.filter((w) => w.complex_id === watch.complex_id && w.trade === watch.trade));
