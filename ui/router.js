@@ -47,7 +47,6 @@ export var Router = {
 };
 
 function remember(path){
-  if (path.indexOf("/import/") === 0) return;      /* 한 번 쓰고 버리는 주소 */
   try{ localStorage.setItem("estate.route", path); }catch(e){ /* private mode */ }
 }
 

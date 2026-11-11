@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{ color-scheme: light dark; --ink:#161A22; --faint:#687182; --line:#E3E7EE; --bg:#fff; --signal:#1F5FD6; --bad:#C2372B; --ok:#1E8E5A; }
+  @media (prefers-color-scheme: dark){ :root{ --ink:#EEF1F6; --faint:#8E98A8; --line:#2A303B; --bg:#14181F; --signal:#4C8FF0; --bad:#F0796C; --ok:#4CC38A; } }
+  body{ width: 320px; margin: 0; padding: 16px; background: var(--bg); color: var(--ink);
+    font: 13px/1.5 -apple-system, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  h1{ margin: 0 0 12px; font-size: 15px; letter-spacing: -.01em; }
+  h1 b{ color: var(--signal); }
+  label{ display: block; margin: 10px 0 4px; font-size: 11.5px; font-weight: 600; color: var(--faint); }
+  input{ width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: transparent; color: inherit; font: inherit; }
+  input:focus-visible, button:focus-visible{ outline: 2px solid var(--signal); outline-offset: 1px; }
+  .row{ display: flex; gap: 8px; margin-top: 14px; }
+  button{ flex: 1; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent;
+    color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary{ background: var(--signal); border-color: var(--signal); color: #fff; }
+  button:disabled{ opacity: .5; cursor: default; }
+  #said{ min-height: 18px; margin: 8px 0 0; font-size: 12px; color: var(--faint); }
+  #log{ margin: 12px 0 0; padding: 10px 0 0; border-top: 1px solid var(--line); list-style: none; font-size: 12px; }
+  #log li{ margin: 3px 0; word-break: keep-all; }
+  #log li.bad{ color: var(--bad); }
+  #log li.ok::before{ content: "✓ "; color: var(--ok); }
+  #when{ font-size: 11.5px; color: var(--faint); }
+</style>
+</head>
+<body>
+  <h1><b>BEM</b>ESTATE 네이버 매물</h1>
+  <label for="site">BEMESTATE 주소</label>
+  <input id="site" type="url" placeholder="https://….vercel.app" spellcheck="false">
+  <label for="at">날마다 가져올 시각</label>
+  <input id="at" type="time">
+  <div class="row">
+    <button id="save" class="primary" type="button">저장</button>
+    <button id="now" type="button">지금 가져오기</button>
+  </div>
+  <p id="said"></p>
+  <ul id="log"></ul>
+  <p id="when"></p>
+  <script src="popup.js"></script>
+</body>
+</html>

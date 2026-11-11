@@ -5,12 +5,11 @@
  *
  *   "#/"                 the watch list
  *   "#/w/<id>"           one watch, at its newest snapshot
- *   "#/w/<id>/<slot>"    the same, at the snapshot you picked
- *   "#/import/<네이버 단지>/<…>"   네이버 매물 탭에서 읽어 온 것을 받는 자리 (estate/naver.js) */
+ *   "#/w/<id>/<slot>"    the same, at the snapshot you picked */
 import { Store } from "./ui/store.js";
 import { Theme } from "./ui/theme.js";
 import { Router } from "./ui/router.js";
-import { renderList, renderWatch, renderImport, wire } from "./estate/screens.js";
+import { renderList, renderWatch, wire } from "./estate/screens.js";
 
 var view = null;
 var wasOn = "";
@@ -32,11 +31,6 @@ function slide(next){
 }
 
 function route(path, segs){
-  if (segs[0] === "import" && segs[1] && segs[2] && Store.state === "ok"){
-    slide("list");
-    renderImport(view, decodeURIComponent(segs[1]), segs.slice(2).join("/"));
-    return;
-  }
   if (segs[0] === "w" && segs[1] && Store.state === "ok"){
     var id = decodeURIComponent(segs[1]);
     if (!Store.watch(id)){ Router.set("/"); return; }

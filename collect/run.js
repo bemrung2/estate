@@ -14,7 +14,7 @@ const molit = require("./molit.js");
 const hogangnono = require("./hogangnono.js");
 const kb = require("./kb.js");
 
-/* 서버가 직접 받는 곳은 직방뿐이다. 네이버 매물은 사람이 넘겨준다(importNaver) — 수집 때는
+/* 서버가 직접 받는 곳은 직방뿐이다. 네이버 매물은 크롬 확장이 넘겨준다(importNaver) — 수집 때는
    오늘 넘겨받아 둔 것을 그대로 둔다. */
 const PLATFORMS = { zigbang, naver };
 const KST = 9 * 3600 * 1000;
@@ -196,15 +196,15 @@ async function run(data, opts) {
 }
 
 /*
- * 네이버 부동산의 단지 매물 탭에서 읽어 넘겨준 목록을 오늘 기록에 넣는다 (api/watch.js).
+ * 크롬 확장이 네이버 매물 탭에서 옮겨 온 줄들을 오늘 기록에 넣는다 (api/watch.js).
  * 그 단지를 보고 있는 관심 평형마다 오늘의 네이버 매물이 통째로 바뀐다 — 직방 것은 그대로.
  * → { watches: [{ id, count }], unmatched }
  */
-async function importNaver(data, complexNo, rawListings) {
+async function importNaver(data, complexNo, rows) {
   const slot = slotOf();
   const watches = ((await data.watches()) || []).filter((w) => w.naver_id === complexNo);
   if (!watches.length) return null;
-  const listings = (rawListings || []).map(naver.clean).filter(Boolean);
+  const listings = naver.parse(rows);
   const { byWatch, unmatched } = naver.assign(listings, watches);
   const done = [];
   for (const w of watches) {

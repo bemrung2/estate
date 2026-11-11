@@ -12,7 +12,7 @@
  *   POST /api/watch { add: { complexId, complexName, address, trade, naver,
  *                            types:[{ id, label, supply, exclusive }] } }
  *   POST /api/watch { link: { complexId, naver } }    네이버 단지를 잇거나("" 이면) 끊는다
- *   POST /api/watch { importNaver: { complex, listings:[…] } }   네이버 매물 탭에서 읽어 온 목록
+ *   POST /api/watch { importNaver: { complex, rows:[…] } }   크롬 확장이 네이버 매물 탭에서 옮겨 온 줄들
  *   POST /api/watch { remove: id }
  */
 const lib = require("./_core.js");
@@ -116,7 +116,7 @@ module.exports = async function handler(req, res) {
 
       if (body && body.importNaver) {
         const complex = naver.complexNo(clean(body.importNaver.complex, 12));
-        const sent = Array.isArray(body.importNaver.listings) ? body.importNaver.listings.slice(0, 800) : null;
+        const sent = Array.isArray(body.importNaver.rows) ? body.importNaver.rows.slice(0, 800) : null;
         if (!complex || !sent) return lib.json(res, 400, { ok: false, error: "body" });
         const done = await importNaver(data, complex, sent);
         if (!done) {
