@@ -105,7 +105,7 @@ export function renderWatch(view, id, slot){
     '<div class="hero-sub">' + place(w.address) +
       '<span class="watch-type">' + esc(w.room_label) + '</span>' +
       '<span class="watch-trade">' + TRADE[w.trade] + '</span></div>' +
-    '<div class="hero-sub links">' + outlink("호갱노노", hogangnonoUrl(w.complex_name)) +
+    '<div class="hero-sub links">' + outlink("호갱노노", hogangnonoUrl(w)) +
       (w.naver_id ? outlink("네이버 부동산", naverComplexUrl(w.naver_id)) : '') + '</div></div>');
   ripple(hero.querySelector(".hero-back"), function(){ nav.go("/"); });
   if (!w.naver_id){
@@ -123,6 +123,8 @@ export function renderWatch(view, id, slot){
     if (mine !== shown || !data) return;
     var history = data.history || [];
     var full = data.watch || w;
+    var hg = hero.querySelector(".links a.outlink");
+    if (hg) hg.href = hogangnonoUrl(full);
     body.innerHTML = "";
     if (!history.length){
       body.appendChild(el('<div class="card dashed"><p class="card-empty">아직 기록이 없습니다. ' +

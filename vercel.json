@@ -11,6 +11,9 @@
     },
     "api/watch.js": {
       "maxDuration": 30
+    },
+    "api/probe.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
@@ -23,5 +26,8 @@
         }
       ]
     }
+  ],
+  "regions": [
+    "icn1"
   ]
 }

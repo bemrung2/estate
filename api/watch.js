@@ -65,10 +65,11 @@ module.exports = async function handler(req, res) {
         if (!watch) return lib.json(res, 404, { ok: false, error: "unknown" });
         /* 면적이나 주소를 아직 모르는 관심(예전에 등록한 것)은 열 때 채운다. 그래야
            실거래가를 가려낼 수 있다. 채웠으면 실거래가도 그 자리에서 한 번 받는다. */
-        if (!Number(watch.exclusive_m2) || !watch.lawd_cd || (molit.enabled() && !watch.deals_at)) {
+        const fresh = !Number(watch.exclusive_m2) || !watch.lawd_cd || (molit.enabled() && !watch.deals_at);
+        if (fresh || !watch.hgnn_id) {
           try {
             const group = await ensure(data, watches.filter((w) => w.complex_id === watch.complex_id && w.trade === watch.trade));
-            await refreshDeals(data, group);
+            if (fresh) await refreshDeals(data, group);
             watch = ((await data.watches()) || []).find((w) => w.id === id) || watch;
           } catch (e) { watch = { ...watch, deals_error: String(e.message || e).slice(0, 160) }; }
         }
@@ -144,7 +145,7 @@ module.exports = async function handler(req, res) {
       const naverId = naver.complexNo(clean(add.naver, 200)) || (sibling && sibling.naver_id) || "";
       let where = sibling ? { lawd_cd: sibling.lawd_cd, dong_name: sibling.dong_name, jibun: sibling.jibun } : null;
       if (!where || !where.lawd_cd) {
-        try { where = await zigbang.place(complexId); }
+        try { const { bcode, ...rest } = await zigbang.place(complexId); where = rest; }
         catch (e) { where = { lawd_cd: "", dong_name: "", jibun: "" }; }
       }
 
@@ -161,7 +162,7 @@ module.exports = async function handler(req, res) {
           room_type_id: typeId, room_label: clean(t.label, 30), trade: add.trade,
           naver_id: naverId, supply_m2: area(t.supply), exclusive_m2: area(t.exclusive),
           lawd_cd: clean(where.lawd_cd, 5), dong_name: clean(where.dong_name, 30), jibun: clean(where.jibun, 20),
-          deals: [], ord: ++ord, created_at: new Date().toISOString()
+          hgnn_id: (sibling && sibling.hgnn_id) || "", deals: [], ord: ++ord, created_at: new Date().toISOString()
         });
         added.push(id);
       }

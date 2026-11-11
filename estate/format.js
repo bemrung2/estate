@@ -50,9 +50,10 @@ export function listingUrl(l){
   return "";
 }
 
-/* 호갱노노는 단지 번호를 따로 쓴다 — 이름으로 찾은 화면으로 보낸다 */
-export function hogangnonoUrl(name){
-  return "https://hogangnono.com/search?q=" + encodeURIComponent(name);
+/* 호갱노노의 그 단지. 번호를 아직 못 찾았으면 이름으로 찾은 화면 */
+export function hogangnonoUrl(w){
+  if (w.hgnn_id && w.hgnn_id !== "-") return "https://hogangnono.com/apt/" + encodeURIComponent(w.hgnn_id);
+  return "https://hogangnono.com/search?q=" + encodeURIComponent(w.complex_name);
 }
 
 export function naverComplexUrl(id){

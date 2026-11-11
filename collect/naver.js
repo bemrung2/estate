@@ -90,6 +90,14 @@ async function catalog(complexId, trade) {
   return { name, listings };
 }
 
+/* 첫 매물 하나를 받은 그대로 — 이름들이 맞는지 볼 때 (api/probe.js) */
+async function raw(complexId) {
+  const data = await get("/complex/getComplexArticleList?hscpNo=" + encodeURIComponent(complexId) +
+    "&tradTpCd=A1&order=prc&showR0=N&page=1");
+  const list = (data && data.result && data.result.list) || null;
+  return list ? list[0] || "(매물 없음)" : data;
+}
+
 /* 이 매물이 그 관심 평형의 것인가 — 공급 면적으로, 전용 면적을 알면 그것으로도 */
 function sameType(listing, watch) {
   const supply = Number(watch.supply_m2), own = Number(watch.exclusive_m2);
@@ -98,4 +106,4 @@ function sameType(listing, watch) {
   return !own || !listing.exclusive || Math.abs(listing.exclusive - own) <= NEAR;
 }
 
-module.exports = { key: "naver", name: "네이버 부동산", catalog, find, sameType, price, complexNo };
+module.exports = { key: "naver", name: "네이버 부동산", catalog, find, raw, sameType, price, complexNo };

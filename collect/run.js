@@ -11,6 +11,7 @@
 const zigbang = require("./zigbang.js");
 const naver = require("./naver.js");
 const molit = require("./molit.js");
+const hogangnono = require("./hogangnono.js");
 
 const PLATFORMS = { zigbang, naver };
 const KST = 9 * 3600 * 1000;
@@ -105,9 +106,17 @@ async function ensure(data, group) {
       if (!Number(w.exclusive_m2) && t.exclusive) note(w.id, { exclusive_m2: t.exclusive });
     });
   }
-  if (group.some((w) => !w.lawd_cd)) {
-    const where = await zigbang.place(head.complex_id);
-    group.forEach((w) => { if (!w.lawd_cd) note(w.id, where); });
+  const noPlace = group.some((w) => !w.lawd_cd), noHgnn = group.some((w) => !w.hgnn_id);
+  if (noPlace || noHgnn) {
+    const { bcode, ...where } = await zigbang.place(head.complex_id);
+    if (noPlace) group.forEach((w) => { if (!w.lawd_cd) note(w.id, where); });
+    if (noHgnn) {
+      /* 호갱노노의 그 단지. 못 찾았으면 "-"로 적어 두어 열 때마다 다시 묻지 않는다 */
+      let id = "";
+      try { id = (await hogangnono.find(head.complex_name, { bcode, jibun: where.jibun })) || "-"; }
+      catch (e) { /* 다음에 다시 */ }
+      if (id) group.forEach((w) => { if (!w.hgnn_id) note(w.id, { hgnn_id: id }); });
+    }
   }
   for (const id of Object.keys(patches)) await data.patchWatch(id, patches[id]);
   return group.map((w) => Object.assign({}, w, patches[w.id]));

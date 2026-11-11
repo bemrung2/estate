@@ -25,6 +25,7 @@ alter table estate_watches add column if not exists exclusive_m2 numeric;       
 alter table estate_watches add column if not exists lawd_cd      text not null default '';  -- 시군구 5자리 (실거래가 조회)
 alter table estate_watches add column if not exists dong_name    text not null default '';  -- 법정동
 alter table estate_watches add column if not exists jibun        text not null default '';  -- 지번
+alter table estate_watches add column if not exists hgnn_id      text not null default '';  -- 호갱노노 단지 번호 ("-" = 못 찾음)
 -- 실거래: [{ id, date:"2026-10-03", price, floor, canceled }] 최근 것이 앞
 alter table estate_watches add column if not exists deals        jsonb not null default '[]'::jsonb;
 alter table estate_watches add column if not exists deals_at     timestamptz;
