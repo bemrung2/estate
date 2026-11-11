@@ -1,0 +1,881 @@
+:root{
+    /* 글씨는 고딕 하나. 라틴과 숫자는 Inter, 한글은 Noto Sans KR이 맡는다.
+       시각처럼 자리가 맞아야 하는 숫자는 같은 글꼴의 고정폭 숫자(tnum)로 쓴다. */
+    --sans: "Inter", "Noto Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+    --mono: var(--sans);
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    --paper: #F4F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #EBEFF5;
+    --surface-3: #DDE3EC;
+    --ink: #111620;
+    --ink-soft: #4D5666;
+    --ink-faint: #687182;
+    --line: #E1E6EE;
+    --line-strong: #C5CCD8;
+
+    --signal: #1F5FD6;
+    --signal-soft: #E2ECFC;
+    --signal-tint: rgba(31, 95, 214, 0.07);
+    --on-signal: #FFFFFF;
+    --travel: #9A6224;
+    --travel-soft: #F7E7D3;
+    --danger: #A32C22;
+    --danger-line: #E6BDB7;
+    --danger-on-ink: #FF9E92;   /* 토스트는 바탕이 뒤집혀 있다 — 그 위에서 읽히는 빨강 */
+
+    --c-air: #3E6FA8;
+    --c-move: #667A86;
+    --c-food: #B26A22;
+    --c-shop: #9B3F6A;
+    --c-stay: #157F6C;
+    --c-free: #6B54B5;
+    --c-todo: #6E7671;
+    --c-sight: #2F7D55;
+    --c-etc: #6E7583;
+
+    --brand-1: #1F5FD6;
+    --brand-2: #12A6DA;
+
+    --toast-bg: var(--surface);
+    --ok: #1E8A57;
+    --warn: #B4690A;
+
+    --shadow: rgba(18, 22, 32, 0.10);
+    --shadow-soft: rgba(18, 22, 32, 0.04);
+    --scrim: rgba(14, 16, 24, 0.40);
+
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper: #0D1016;
+      --surface: #151A22;
+      --surface-2: #1C222C;
+      --surface-3: #27303C;
+      --ink: #E8ECF3;
+      --ink-soft: #9EA8B7;
+      --ink-faint: #707A8A;
+      --line: #212833;
+      --line-strong: #36404E;
+
+      --signal: #5FA3FF;
+      --signal-soft: #132A4D;
+      --signal-tint: rgba(95, 163, 255, 0.13);
+      --on-signal: #04152F;
+      --travel: #E3A96C;
+      --travel-soft: #3D2F1C;
+      --danger: #FF9E92;
+      --danger-line: #56302C;
+      --danger-on-ink: #A32C22;
+
+      --c-air: #8FB8E8;
+      --c-move: #A3B2BC;
+      --c-food: #E3A96C;
+      --c-shop: #E38BB4;
+      --c-stay: #5FD3C0;
+      --c-free: #AE9BF0;
+      --c-todo: #9DA9A3;
+      --c-sight: #7FD6A3;
+      --c-etc: #9AA2B1;
+
+      --brand-1: #6AAEFF;
+      --brand-2: #5FE0F0;
+
+      --toast-bg: var(--surface-3);
+      --ok: #5FD39A;
+      --warn: #F0B35C;
+
+      --shadow: rgba(0, 0, 0, 0.5);
+      --shadow-soft: rgba(0, 0, 0, 0.2);
+      --scrim: rgba(0, 0, 0, 0.58);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper: #0D1016;
+    --surface: #151A22;
+    --surface-2: #1C222C;
+    --surface-3: #27303C;
+    --ink: #E8ECF3;
+    --ink-soft: #9EA8B7;
+    --ink-faint: #707A8A;
+    --line: #212833;
+    --line-strong: #36404E;
+
+    --signal: #5FA3FF;
+    --signal-soft: #132A4D;
+    --signal-tint: rgba(95, 163, 255, 0.13);
+    --on-signal: #04152F;
+    --travel: #E3A96C;
+    --travel-soft: #3D2F1C;
+    --danger: #FF9E92;
+    --danger-line: #56302C;
+    --danger-on-ink: #A32C22;
+
+    --c-air: #8FB8E8;
+    --c-move: #A3B2BC;
+    --c-food: #E3A96C;
+    --c-shop: #E38BB4;
+    --c-stay: #5FD3C0;
+    --c-free: #AE9BF0;
+    --c-todo: #9DA9A3;
+    --c-sight: #7FD6A3;
+    --c-etc: #9AA2B1;
+
+    --brand-1: #6AAEFF;
+    --brand-2: #5FE0F0;
+
+    --toast-bg: var(--surface-3);
+    --ok: #5FD39A;
+    --warn: #F0B35C;
+
+    --shadow: rgba(0, 0, 0, 0.5);
+    --shadow-soft: rgba(0, 0, 0, 0.2);
+    --scrim: rgba(0, 0, 0, 0.58);
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  button, label, a, summary{ touch-action: manipulation; }
+
+  html{ height: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body{
+    min-height: 100%;
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    letter-spacing: -0.012em;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    display: flex;
+    justify-content: center;
+    /* the page scrolls one way only */
+    overflow-x: hidden;
+  }
+
+  .app{ width: 100%; max-width: 440px; min-width: 0; background: var(--paper); }
+  .mono{ font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .icon{ width: 22px; height: 22px; display: block; flex-shrink: 0; }
+
+  /* No app bar and no back button: the title line carries the only control,
+     so the screen starts at the content. */
+  .icon-btn{
+    width: 40px; height: 40px;
+    border: none; background: transparent; color: var(--ink);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .icon-btn:hover{ background: var(--surface-2); }
+  .icon-btn:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+  .icon-btn .icon{ width: 20px; height: 20px; }
+
+/* ---------- touch ---------- */
+  /* Material's press: ink spreads from the point the finger landed on and
+     fades when it lifts. Anything with .rip hosts it.
+     The ink MUST be out of flow — a static one would resize its button
+     mid-tap, and the browser would hand the click to the parent. */
+  .rip{ position: relative; overflow: hidden; isolation: isolate; }
+  .rip > .ink{
+    position: absolute; border-radius: 50%; pointer-events: none;
+    background: currentColor; opacity: 0.12;
+    transform: scale(0);
+    animation: ink-in 420ms cubic-bezier(0.2, 0, 0.1, 1) forwards;
+    z-index: 0;
+  }
+  .rip > .ink.out{
+    animation: ink-in 420ms cubic-bezier(0.2, 0, 0.1, 1) forwards,
+               ink-out 280ms ease-out forwards;
+  }
+  @keyframes ink-in{ to{ transform: scale(1); } }
+  @keyframes ink-out{ to{ opacity: 0; } }
+  .rip > *:not(.ink){ position: relative; z-index: 1; }
+
+  /* a press also sinks, which reads as weight rather than as a highlight */
+  /* 눌리면 살짝 가라앉고, 색은 한 번에 바뀌지 않고 번지듯 옮겨 간다 */
+  .btn, .trip-open, .kakao, .daybtn, .chip, .pick, .tab, .check, .quietbtn, .linkbtn,
+  .icon-btn, .btn-text, .addcard, .trip-pin, .theme-row, .routerow, .rowbtn, .timebox, .attpick button{
+    transition: transform 140ms var(--ease), background-color 180ms ease, color 180ms ease,
+                border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  }
+  .btn:active, .trip-open:active, .kakao:active, .addcard:active, .theme-row:active,
+  .routerow:active{ transform: scale(0.985); }
+  .pick:active, .chip:active, .daybtn:active, .check:active, .btn-text:active,
+  .icon-btn:active, .trip-pin:active, .quietbtn:active{ transform: scale(0.95); }
+
+  @media (prefers-reduced-motion: reduce){
+    .rip > .ink{ animation-duration: 1ms; }
+    .btn:active, .trip-open:active, .kakao:active, .addcard:active, .theme-row:active, .routerow:active,
+    .pick:active, .chip:active, .daybtn:active, .check:active, .btn-text:active,
+    .icon-btn:active, .trip-pin:active, .quietbtn:active{ transform: none; }
+  }
+
+/* ---------- the page ---------- */
+  .pad{ padding: calc(var(--safe-t) + 18px) 18px 0; }
+  /* BEMTRIP — 앞은 글자색, 뒤는 이름의 색. 색은 토큰에서만 온다. */
+  .brand{
+    margin: 0; font-size: 25px; font-weight: 800; line-height: 1.1;
+    letter-spacing: -0.035em; white-space: nowrap;
+  }
+  .brand-a{ color: var(--ink); }
+  .brand-b{
+    color: var(--brand-1);
+    background: linear-gradient(100deg, var(--brand-1), var(--brand-2));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .build-stamp{ margin: 18px 0 30px; font-size: 10.5px; color: var(--ink-faint); text-align: center; }
+  .account-row{ display: flex; justify-content: center; gap: 4px; margin-top: 26px; flex-wrap: wrap; }
+  .linkbtn{
+    display: inline-flex; align-items: center; gap: 6px;
+    border: none; background: transparent; color: var(--ink-faint);
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 9px 14px; border-radius: 999px; cursor: pointer;
+  }
+  .linkbtn .icon, .linkbtn .kakao-mark{ width: 15px; height: 15px; }
+  .linkbtn:hover{ color: var(--signal); background: var(--surface-2); }
+  .linkbtn:focus-visible{ outline: 2px solid var(--signal); outline-offset: 1px; }
+
+
+/* ---------- sheets & dialogs ---------- */
+  .scrim{
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--scrim);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .scrim.mid{ align-items: center; padding: 20px; }
+  .sheet{
+    width: 100%; max-width: 440px; min-width: 0;
+    background: var(--paper);
+    border-radius: 26px 26px 0 0;
+    max-height: 90vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 -12px 40px -8px var(--shadow);
+    overflow: hidden;
+  }
+  @supports (max-height: 90dvh){ .sheet{ max-height: 90dvh; } }
+  .sheet-grip{ width: 34px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 10px auto 0; flex-shrink: 0; }
+  .sheet-head{ display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 18px; flex-shrink: 0; }
+  .sheet-title{ flex: 1; min-width: 0; font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.025em; }
+  .sheet-sub{ font-size: 11.5px; color: var(--ink-faint); margin: 1px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet-body{
+    flex: 1; min-height: 0;
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 18px 8px;
+    overscroll-behavior: contain;
+  }
+  /* 아래 단추 줄이 없는 창은 내용이 화면 끝에 붙지 않게 */
+  .sheet-body:last-child{ padding-bottom: calc(22px + var(--safe-b)); }
+  .sheet-body > .rowline{ padding: 12px 0; }
+  .sheet-body > .rowline .rowbody b{ display: flex; align-items: center; gap: 7px; }
+  .sheet-foot{
+    display: flex; gap: 8px; flex-shrink: 0;
+    padding: 12px 18px calc(14px + var(--safe-b));
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .fld{ margin-bottom: 14px; }
+  .fld > label, .fld-col > label{
+    display: block; font-size: 12px; font-weight: 600; letter-spacing: -0.005em;
+    color: var(--ink-soft); margin-bottom: 6px;
+  }
+  .fld input, .fld textarea{
+    display: block; width: 100%; min-width: 0; max-width: 100%;
+    border: 1px solid var(--line-strong); border-radius: 12px;
+    font-family: inherit; font-size: 16px;
+    background: var(--surface); color: var(--ink);
+    /* iOS sizes date/time inputs from their own chrome; dropping it lets the
+       box honour its container instead. */
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+  /* one fixed height for every single-line control, so a box never changes
+     size with what is (or is not) typed in it */
+  .fld input{ height: 47px; padding: 0 13px; }
+  /* 여러 줄 칸은 한 줄 높이에서 시작해 적는 만큼 자란다 (grow) */
+  .fld textarea{ resize: none; min-height: 47px; padding: 11px 13px; line-height: 1.5; overflow-y: auto; }
+  .fld textarea[rows="2"]{ min-height: 72px; }
+  .fld input::placeholder, .fld textarea::placeholder{ color: var(--ink-faint); opacity: 0.75; }
+  /* 비었거나 틀린 칸 */
+  .fld input.bad, .fld textarea.bad, .pickbox.bad, .timebox.bad{
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 16%, transparent);
+    animation: nudge 280ms var(--ease);
+  }
+  @keyframes nudge{ 25%{ transform: translateX(-4px); } 60%{ transform: translateX(3px); } }
+  @media (prefers-reduced-motion: reduce){ .bad{ animation: none !important; } }
+  .fld input:focus, .fld textarea:focus{
+    outline: none; border-color: var(--signal);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 18%, transparent);
+  }
+  .fld-hint{ font-size: 11.5px; color: var(--ink-faint); margin: 6px 0 0; }
+
+  .fld-row{ display: flex; gap: 10px; }
+  .fld-col{ flex: 1 1 0; min-width: 0; }
+  /* just wide enough for one emoji — it must never crowd the name beside it */
+  .flag-col{ flex: 0 0 74px; width: 74px; }
+  .flag-col input{ text-align: center; }
+
+  /* Date and time inputs are drawn by the platform: iOS sizes them from their
+     own text (so an empty one and a filled one differ) and parks the value at
+     the top of the box. So the box paints the value itself as ordinary text,
+     and the real input lies invisible on top of it — the native picker still
+     opens on tap, but nothing about the platform's rendering reaches layout. */
+  .pickbox{
+    position: relative;
+    /* 값은 칸 한가운데. "--:--"가 왼쪽에 붙어 있으면 두 칸이 어긋나 보인다. */
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; height: 47px; padding: 0 13px;
+    border: 1px solid var(--line-strong); border-radius: 12px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .pickbox:focus-within{ border-color: var(--signal); }
+  .pickbox .pickval{
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 16px; color: var(--ink);
+    line-height: 1; white-space: nowrap; text-align: center;
+  }
+  .pickbox.blank .pickval{ color: var(--ink-faint); }
+  /* 시각을 고르는 칸. 누르면 휠이 열린다. */
+  .timebox{
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; height: 47px; padding: 0 10px;
+    border: 1px solid var(--line-strong); border-radius: 12px;
+    background: var(--surface); cursor: pointer; overflow: hidden;
+  }
+  .timeval{ font-size: 16px; font-weight: 600; color: var(--ink); line-height: 1; }
+  .timebox.blank .timeval{ color: var(--ink-faint); }
+  .timebox:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  /* 휠. 가운데 띠에 멈춘 것이 고른 것이다. */
+  .wheels{
+    position: relative; display: flex; align-items: center; justify-content: center;
+    gap: 4px; margin: 2px 0 6px;
+  }
+  .wheel-bar{
+    position: absolute; left: 8px; right: 8px; top: 50%; height: 38px;
+    transform: translateY(-50%); border-radius: 11px;
+    background: var(--surface-2); pointer-events: none;
+  }
+  .wheel{
+    position: relative; z-index: 1;
+    width: 92px; height: 190px; overflow-y: auto;
+    scroll-snap-type: y mandatory; overscroll-behavior: contain;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .wheel::-webkit-scrollbar{ display: none; }
+  .wheel-pad{ height: 76px; }          /* (190 - 38) / 2 */
+  .wheel-item{
+    height: 38px; line-height: 38px; scroll-snap-align: center; cursor: pointer;
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 19px; font-weight: 600; text-align: center; color: var(--ink-faint);
+    transition: color 0.12s ease, opacity 0.12s ease;
+    opacity: 0.55;
+  }
+  .wheel-item.on{ color: var(--ink); opacity: 1; }
+  .wheel-sep{
+    position: relative; z-index: 1;
+    font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 600;
+    color: var(--ink-faint);
+  }
+  @media (prefers-reduced-motion: reduce){ .wheel{ scroll-behavior: auto; } }
+
+  .pickbox input{
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; min-width: 0;
+    margin: 0; padding: 0; border: none;
+    opacity: 0;
+    background: transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+
+  .pickrow{ display: flex; gap: 6px; flex-wrap: wrap; }
+  /* 고를 것이 많으면 한 줄로 흐른다. 창의 가장자리까지 닿아, 더 있다는 것이 보인다. */
+  .pickrow.scroll{
+    flex-wrap: nowrap; overflow-x: auto; margin: 0 -18px; padding: 0 18px 2px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+  }
+  .pickrow.scroll::-webkit-scrollbar{ display: none; }
+  .pickrow.scroll .pick{ flex-shrink: 0; scroll-snap-align: center; }
+  .pick{
+    border: 1px solid var(--line-strong); border-radius: 999px;
+    background: transparent; color: var(--ink-soft);
+    font: inherit; font-size: 13px; font-weight: 600;
+    padding: 8px 13.5px; cursor: pointer; white-space: nowrap;
+  }
+  .pick[aria-pressed="true"]{ background: var(--signal); color: var(--on-signal); border-color: var(--signal); }
+  .pick:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  .btn{
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    border: none; border-radius: 999px; padding: 14px 20px;
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary{
+    background: var(--signal); color: var(--on-signal); flex: 1;
+    box-shadow: 0 8px 18px -10px var(--signal);
+  }
+  .btn .icon{ width: 18px; height: 18px; }
+  
+  .btn-danger{ background: transparent; color: var(--danger); border: 1px solid var(--line-strong); }
+  .btn:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  .attpick{ display: flex; gap: 7px; margin: 6px 0 14px; }
+  .attpick button{
+    flex: 1 1 0; min-width: 0;
+    border: 1px solid var(--line-strong); border-radius: 12px;
+    background: transparent; color: var(--ink-soft);
+    font: inherit; font-size: 13px; font-weight: 600;
+    padding: 11px 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .attpick button .icon{ width: 15px; height: 15px; }
+  .attpick button[aria-pressed="true"]{ background: var(--signal); color: var(--on-signal); border-color: var(--signal); }
+
+  .attlist{ border-top: 1px solid var(--line); margin-top: 6px; }
+  .attlist-row{ display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .attlist-row .att-thumb{ width: 44px; height: 44px; border-radius: 10px; }
+  .attlist-body{ flex: 1; min-width: 0; font-size: 13px; }
+  .attlist-body b{ display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attlist-body small{ display: block; font-size: 11px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attlist-body p{ margin: 0; color: var(--ink-soft); white-space: pre-wrap; word-break: break-word; }
+
+  /* 가운데 뜨는 창. 글은 넉넉한 폭으로 한두 줄에 끝나고, 단추는 손가락 크기의
+     알약이다 — 하려는 일은 색으로, 물러서는 일은 옅은 면으로. */
+  .dialog{
+    background: var(--surface); border-radius: 22px; padding: 22px 20px 18px;
+    width: 100%; max-width: 380px;
+    border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    box-shadow: 0 28px 64px -16px var(--shadow), 0 2px 8px var(--shadow-soft);
+  }
+  .dialog h3{ margin: 0 2px 14px; font-size: 18px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.35; }
+  .dialog-body{
+    font-size: 14px; line-height: 1.6; color: var(--ink-soft);
+    margin: -8px 2px 18px; word-break: keep-all;
+  }
+  .dialog .fld{ margin-bottom: 4px; }
+  .btn-text[disabled]{ opacity: 0.4; cursor: default; }
+  .dialog-actions{ display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-top: 16px; }
+  .dialog-actions .spacer{ flex: 1; }
+  .btn-text{
+    min-height: 44px; padding: 0 18px;
+    background: var(--surface-2); border: none; color: var(--ink);
+    font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; border-radius: 13px;
+  }
+  .btn-text:hover{ background: var(--surface-3); }
+  .btn-text.go{ background: var(--signal); color: var(--on-signal); }
+  .btn-text.go:hover{ background: color-mix(in srgb, var(--signal) 88%, var(--ink)); }
+  .btn-text.danger{ background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+  .btn-text.danger:hover{ background: color-mix(in srgb, var(--danger) 18%, transparent); }
+  /* 묻는 창은 두 단추가 반씩 나눠 선다 */
+  .dialog.ask{ max-width: 360px; }
+  .dialog.ask .spacer{ display: none; }
+  .dialog.ask .btn-text{ flex: 1 1 0; }
+
+  .photoview{
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.92);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 80; padding: 16px;
+  }
+  .photoview img{ max-width: 100%; max-height: 100%; border-radius: 10px; }
+
+  /* 알림. 폭은 글이 정한다 — left:50%에 그냥 두면 화면 반쪽 폭에서 접혀 짧은 말도
+     두 줄이 된다. 그래서 max-content로 재고, 화면 폭에서 멈춘다.
+     바탕을 뒤집지 않고 화면 위에 한 겹 떠 있는 판으로 둔다. 되돌릴 수 있는 알림은
+     무엇을 했는지 아이콘 하나로 말하고, 되돌릴 수 있는 남은 시간을 밑줄이 줄어들며 보여준다. */
+  .toast{
+    --tone: var(--ink-soft);
+    position: fixed; left: 50%; bottom: calc(22px + var(--safe-b));
+    transform: translateX(-50%) translateY(16px) scale(0.96);
+    width: max-content; max-width: min(calc(100vw - 32px), 420px);
+    display: flex; align-items: center; gap: 12px;
+    /* color-mix를 모르는 브라우저는 앞줄의 불투명한 바탕을 그대로 쓴다. */
+    background: var(--toast-bg);
+    background: color-mix(in srgb, var(--toast-bg) 92%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5); backdrop-filter: blur(20px) saturate(1.5);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 9px 9px 9px 10px; border-radius: 18px;
+    box-shadow: 0 22px 48px -16px var(--shadow), 0 4px 14px var(--shadow-soft);
+    font-size: 14px; font-weight: 600; line-height: 1.45; letter-spacing: -0.02em;
+    z-index: 90; opacity: 0; pointer-events: none; overflow: hidden;
+    transition: opacity 220ms ease, transform 340ms var(--ease);
+    text-align: left; word-break: keep-all;
+  }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  .toast.plain{ padding: 12px 20px; text-align: center; font-weight: 500; }
+  .toast.delete{ --tone: var(--danger); }
+  /* 됐다는 알림은 초록 체크 — 체크는 그려지듯 나타난다 */
+  .toast.edit, .toast.done{ --tone: var(--ok); }
+  .toast.done, .toast.warn{ padding-right: 18px; }
+  /* 부탁이나 거절 — 틀린 것은 아니고, 봐달라는 뜻의 호박색 */
+  .toast.warn{ --tone: var(--warn); }
+  .toast.edit .toast-ic polyline, .toast.done .toast-ic polyline{
+    stroke-width: 2.4; stroke-dasharray: 22; stroke-dashoffset: 22;
+  }
+  .toast.show.edit .toast-ic polyline, .toast.show.done .toast-ic polyline{
+    animation: check-draw 380ms 120ms var(--ease) forwards;
+  }
+  @keyframes check-draw{ to{ stroke-dashoffset: 0; } }
+  .toast-ic{
+    flex-shrink: 0; width: 32px; height: 32px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--tone) 13%, transparent); color: var(--tone);
+  }
+  .toast-ic .icon{ width: 16px; height: 16px; }
+  .toast .toast-msg{ flex: 1 1 auto; min-width: 0; padding: 2px 4px 2px 0; }
+  /* 토스트 자체는 끝까지 손가락을 막지 않는다. 받는 것은 떠 있는 동안의
+     되돌리기 단추 하나뿐이다 — 사라진 뒤에도 남아 있으면 그 아래가 눌리지 않는다. */
+  .toast .toast-do{ pointer-events: none; }
+  .toast.show .toast-do{ pointer-events: auto; }
+  /* 되돌리기는 무를 수 있다는 뜻이고, 무르는 쪽이 빨강이다 */
+  .toast .toast-do{
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+    border: none; border-radius: 12px; cursor: pointer;
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    color: var(--danger);
+    font: inherit; font-size: 13.5px; font-weight: 700; padding: 8px 13px 8px 11px;
+    transition: background-color 160ms ease, transform 140ms var(--ease);
+  }
+  .toast .toast-do .icon{ width: 15px; height: 15px; }
+  .toast .toast-do:hover{ background: color-mix(in srgb, var(--danger) 17%, transparent); }
+  .toast .toast-do:active{ transform: scale(0.95); }
+  /* 되돌릴 수 있는 남은 시간 */
+  .toast-bar{
+    position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: var(--tone); opacity: 0.55; transform-origin: left center;
+    animation: toast-left linear forwards;
+  }
+  @keyframes toast-left{ from{ transform: scaleX(1); } to{ transform: scaleX(0); } }
+
+  .tabpad{ padding-bottom: calc(36px + var(--safe-b)); }
+  .tabpad > .card:first-child{ margin-top: 16px; }
+
+  /* 창이 떠 있는 동안: 뒤는 구르지 않고, 알림은 창의 단추 위로 올라선다 */
+  html.modal-open, html.modal-open body{ overflow: hidden; }
+  html.modal-open:has(.sheet-foot) .toast{ bottom: calc(104px + var(--safe-b)); }
+
+  @media (prefers-reduced-motion: reduce){
+    .toast{ transition: none; }
+    .toast-bar{ animation: none; opacity: 0; }
+    .toast .toast-ic polyline{ animation: none !important; stroke-dashoffset: 0 !important; }
+    .pulse-live i{ animation: none; }
+  }
+  [hidden]{ display: none !important; }
+  /* While a row is being dragged, nothing else on the page reacts to the
+     finger: no text selection, no iOS magnifier, no hover highlights. */
+  body.dragging-row{
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    touch-action: none;            /* 끌고 있는 동안에는 화면이 따라 움직이지 않는다 */
+  }
+
+/* ---------- cards ---------- */
+  /* 카드마다 제 색을 하나 쥔다. 아이콘 · 머리말 · 강조가 전부 그 색에서
+     나오므로, 탭이 달라도 같은 체계로 보인다. 색은 토큰에서만 온다. */
+  .card{
+    --accent: var(--signal);
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 20px; padding: 16px; margin: 0 18px 10px;
+    box-shadow: 0 1px 2px var(--shadow-soft);
+  }
+  .card.t-air{ --accent: var(--c-air); }
+  .card.t-stay{ --accent: var(--c-stay); }
+  .card.t-book{ --accent: var(--c-free); }
+  .card.t-link{ --accent: var(--signal); }
+  .card.t-pack{ --accent: var(--c-food); }   /* 숙소의 초록과 나란히 두면 구분이 안 된다 */
+  .card.t-note{ --accent: var(--c-move); }
+  .card.t-food{ --accent: var(--c-food); }
+  .card.t-shop{ --accent: var(--c-shop); }
+  .card-ic{
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 24px; height: 24px; border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+  }
+  .card-ic .icon{ width: 14px; height: 14px; }
+  .card.dashed{ background: transparent; border-style: dashed; box-shadow: none; }
+  .dangerfoot{ display: flex; justify-content: center; padding: 6px 18px 2px; }
+  .linkbtn.danger{ color: var(--ink-faint); }
+  .linkbtn.danger:hover{ color: var(--danger); background: transparent; }
+  .card-top{ display: flex; align-items: flex-start; gap: 10px; }
+  .card-name{ flex: 1; min-width: 0; font-size: 16px; font-weight: 700; margin: 0; word-break: keep-all; letter-spacing: -0.02em; }
+  .card-when{ font-size: 12px; color: var(--accent); font-weight: 700; margin: 0 0 3px; }
+  .card-row{ display: flex; align-items: center; gap: 8px; margin: -4px -6px 2px 0; }
+  .card-row .card-when{ flex: 1; min-width: 0; margin: 0; }
+  /* 이름 아래 첫 체크 줄은 이름에 붙지 않는다 */
+  .card-top + .rowline, .card-kind + .rowline{ margin-top: 12px; }
+  .card-when.undated{ color: var(--ink-faint); }
+  .card-head h3.undated{ color: var(--ink-faint); }
+  /* 쇼핑리스트를 더하는 자리 — 목록 바로 아래, 작게 */
+  .buyadd{ margin-top: 10px; }
+  /* '선택'이라 적힌 칸은 비워도 된다는 뜻이다 */
+  .opt{
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px;
+    font-size: 10.5px; font-weight: 600; vertical-align: 1px;
+    background: var(--surface-2); color: var(--ink-faint);
+  }
+  .card-kind{ font-size: 12.5px; color: var(--ink-soft); margin: 4px 0 0; }
+  .card-meta{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .card-empty{ font-size: 12.5px; color: var(--ink-faint); margin: 8px 0 2px; }
+
+  .card-head{ display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
+  .card-head h3{
+    flex: 1; min-width: 0; margin: 0;
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.01em; color: var(--accent);
+  }
+  .card-n{
+    margin-left: 6px; padding: 1px 6px; border-radius: 6px;
+    font-size: 10.5px; color: var(--ink-faint);
+    background: var(--surface-2);
+  }
+  /* 줄 앞의 아이콘도 그 카드의 색을 따른다 */
+  .rowbtn > .icon{ color: var(--accent); flex-shrink: 0; }
+
+  .group-label{ display: flex; align-items: baseline; gap: 8px; padding: 20px 18px 8px; }
+  .group-label:has(.quickadd){ align-items: center; padding: 12px 12px 0 18px; }
+  .group-label h3{
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-faint); margin: 0;
+  }
+  .group-count{ font-size: 11px; color: var(--ink-faint); }
+
+
+/* ---------- rows inside cards ---------- */
+  .rowline{ display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); }
+  .rowline:first-of-type{ margin-top: 10px; }
+  .rowbtn{
+    flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px;
+    border: none; background: transparent; color: inherit;
+    font: inherit; text-align: left; padding: 12px 0; cursor: pointer;
+  }
+  
+  .rowbtn > .icon{ width: 17px; height: 17px; color: var(--ink-faint); margin-top: 2px; }
+  .rowbody{ flex: 1; min-width: 0; }
+  .rowbody b{ display: block; font-size: 14px; font-weight: 600; word-break: keep-all; }
+  .rowbody small{ display: block; font-size: 12px; font-weight: 400; color: var(--ink-soft); margin-top: 2px; word-break: keep-all; }
+  .rowbody .lbl{ display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.01em; color: var(--ink-faint); margin-bottom: 2px; }
+  .rowpen{ width: 13px; height: 13px; color: var(--ink-faint); opacity: 0.55; flex-shrink: 0; margin-top: 4px; }
+  .rowline.on .rowbody b{ text-decoration: line-through; color: var(--ink-faint); }
+
+  .airline-name{ color: var(--accent); font-weight: 700; }
+  .flightno{ font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink-soft); margin-left: 6px; font-size: 13px; }
+
+  .check{
+    width: 28px; height: 28px; flex-shrink: 0; margin-top: 9px;
+    border: 1.5px solid var(--line-strong); border-radius: 9px;
+    background: transparent; color: transparent;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .check .icon{ width: 16px; height: 16px; }
+  .check[aria-pressed="true"]{ background: var(--signal); border-color: var(--signal); color: var(--on-signal); }
+  /* 체크하는 줄: 줄 전체가 체크이고, 끝의 연필이 수정이다 */
+  .checkrow .rowbtn{ align-items: center; gap: 12px; padding: 9px 0; }
+  .checkrow .check{ margin-top: 0; width: 26px; height: 26px; border-radius: 9px; transition: background-color 160ms ease, border-color 160ms ease; }
+  .checkrow .check .icon{ width: 15px; height: 15px; }
+  .checkrow.on .rowbody b{ font-weight: 500; }
+  .rowedit{ width: 36px; height: 36px; justify-content: center; padding: 0; flex-shrink: 0; margin-right: -8px; opacity: 0.7; }
+  .check:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+
+
+/* ---------- chips ---------- */
+  .chiprow{ display: flex; gap: 7px; padding: 16px 18px 2px; overflow-x: auto; }
+  .chiprow::-webkit-scrollbar{ display: none; }
+  .chip{
+    flex-shrink: 0;
+    border: 1px solid var(--line-strong); border-radius: 999px;
+    background: transparent; color: var(--ink-soft);
+    padding: 8px 15px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .chip[aria-pressed="true"]{ background: var(--signal-soft); color: var(--signal); border-color: transparent; }
+  .chip:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  .badge{
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 8px;
+    background: var(--surface-2); color: var(--ink-soft);
+  }
+  /* 분류는 제 색으로 옅게 칠한다 — 글자색만 바뀌면 테두리뿐인 배지가 되어
+     주변보다 오히려 무거워 보인다. 색은 인라인으로 들어온 분류 색이다. */
+  .badge.cat{
+    background: color-mix(in srgb, currentColor 14%, transparent);
+    border: none; font-weight: 700;
+  }
+  .badge.tag{ background: var(--signal-soft); color: var(--signal); }
+  /* 다른 탭에서 온 것이라는 표시 */
+  .badge.from{
+    margin-left: 7px; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; background: var(--surface-2); color: var(--ink-faint);
+  }
+  .card.mirrored{ border-style: dashed; }
+  .maplink{
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 8px;
+    background: var(--surface-2); color: var(--ink-soft); text-decoration: none;
+  }
+  .maplink .icon{ width: 13px; height: 13px; }
+
+
+/* ---------- add affordances ---------- */
+  .addcard{
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    width: calc(100% - 36px); margin: 6px 18px 0;
+    border: 1px dashed var(--line-strong); border-radius: 16px;
+    background: transparent; color: var(--ink-faint);
+    font: inherit; font-size: 13.5px; font-weight: 600; padding: 15px; cursor: pointer;
+  }
+  .addcard .icon{ width: 16px; height: 16px; }
+  .addcard:hover{ color: var(--signal); border-color: var(--signal); background: var(--signal-tint); }
+
+
+/* ---------- attachments ---------- */
+  .att{ margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+  .att-photos{ display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .att-photos::-webkit-scrollbar{ display: none; }
+  .att-thumb{
+    width: 68px; height: 68px; flex-shrink: 0;
+    border-radius: 12px; border: 1px solid var(--line);
+    background: var(--surface-2); object-fit: cover; cursor: pointer; padding: 0; display: block;
+  }
+  .att-note{
+    font-size: 12.5px; color: var(--ink-soft);
+    border-left: 2px solid var(--line-strong); padding: 1px 0 1px 10px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .att-link{
+    display: inline-flex; align-items: center; gap: 6px;
+    align-self: flex-start; max-width: 100%;
+    background: var(--surface-2); color: var(--ink);
+    border-radius: 10px; padding: 7px 11px;
+    font-size: 12.5px; font-weight: 600; text-decoration: none;
+  }
+  .att-link .icon{ width: 14px; height: 14px; color: var(--signal); }
+  .att-link span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .quietbtn{
+    display: inline-flex; align-items: center; gap: 4px;
+    border: none; background: transparent; color: var(--ink-faint);
+    font: inherit; font-size: 12px; font-weight: 600;
+    min-height: 32px; padding: 6px 9px; cursor: pointer; border-radius: 10px;
+  }
+  .quietbtn .icon{ width: 14px; height: 14px; }
+  .quietbtn:hover{ color: var(--signal); background: var(--surface-2); }
+  .quietbtn:focus-visible{ outline: 2px solid var(--signal); outline-offset: 1px; }
+  .quietbtn.has{ color: var(--signal); }
+  /* 아이콘만 있는 단추 — 네모난 손가락 자리 */
+  .quietbtn.ico{ min-width: 32px; padding: 6px; justify-content: center; }
+  .quietbtn.ico .icon{ width: 15px; height: 15px; }
+  /* 줄 아래에 붙은 첨부 (정보 탭) */
+  .rowline > .tl-actions{ align-self: flex-start; margin: 8px -6px 0 0; gap: 0; }
+  .rowatt{ padding: 0 0 12px 27px; margin-top: -4px; }
+  .rowatt .att{ margin-top: 0; }
+
+
+  /* ---------- 창이 뜨고 질 때 ---------- */
+  /* 무엇이든 한 번에 튀어나오지 않는다. 바탕은 옅어지며 깔리고, 아래 창은 밑에서
+     올라오고, 가운데 창은 살짝 커지며 선다. 닫힐 때(.leaving)는 그 반대로 빠르게. */
+  @keyframes fade-in{ from{ opacity: 0; } }
+  @keyframes fade-out{ to{ opacity: 0; } }
+  @keyframes rise-in{ from{ transform: translateY(26px); opacity: 0.4; } }
+  @keyframes sink-out{ to{ transform: translateY(26px); opacity: 0; } }
+  @keyframes pop-in{ from{ transform: scale(0.94); opacity: 0; } }
+  @keyframes pop-out{ to{ transform: scale(0.96); opacity: 0; } }
+  .scrim, .photoview{ animation: fade-in 220ms ease-out; }
+  .scrim > .sheet{ animation: rise-in 320ms var(--ease); }
+  .scrim > .dialog{ animation: pop-in 240ms var(--ease); }
+  .scrim.leaving, .photoview.leaving{ animation: fade-out 170ms ease-in forwards; pointer-events: none; }
+  .scrim.leaving > .sheet{ animation: sink-out 170ms ease-in forwards; }
+  .scrim.leaving > .dialog{ animation: pop-out 170ms ease-in forwards; }
+  /* 탭을 옮기면 내용이 제자리에서 서서히 떠오른다. 움직이지는 않는다. */
+  .tab-in{ animation: fade-in 260ms ease-out; }
+  @media (prefers-reduced-motion: reduce){
+    .scrim, .photoview, .scrim > .sheet, .scrim > .dialog, .tab-in{ animation: none; }
+    .scrim.leaving, .photoview.leaving{ animation: fade-out 1ms forwards; }
+    .scrim.leaving > .sheet, .scrim.leaving > .dialog{ animation: none; }
+  }
+
+  /* ---------- 화면이 바뀔 때 ---------- */
+  /* 들어갈 때는 오른쪽에서, 나올 때는 왼쪽에서 — 손가락이 민 방향대로 */
+  @keyframes slide-in{ from{ opacity: 0; transform: translateX(16px); } }
+  @keyframes slide-back{ from{ opacity: 0; transform: translateX(-16px); } }
+  .slide-in{ animation: slide-in 230ms cubic-bezier(0.2, 0, 0.1, 1); }
+  .slide-back{ animation: slide-back 230ms cubic-bezier(0.2, 0, 0.1, 1); }
+  @media (prefers-reduced-motion: reduce){
+    .slide-in, .slide-back{ animation: none; }
+  }
+
+  /* ---------- waiting ---------- */
+  /* Shaped like what is coming, so the page does not jump when it arrives. */
+  .trip-card.ghost{ cursor: default; pointer-events: none; padding: 20px 16px; }
+  .bar{
+    display: block; height: 10px; border-radius: 5px;
+    background: var(--surface-2);
+    animation: breathe 1.4s ease-in-out infinite;
+  }
+  .bar-s{ width: 44px; height: 8px; }
+  .bar-m{ width: 52%; margin-top: 11px; height: 17px; }
+  .bar-l{ width: 72%; margin-top: 11px; }
+  .ghost .bar-m{ animation-delay: 0.1s; }
+  .ghost .bar-l{ animation-delay: 0.2s; }
+  @keyframes breathe{ 0%, 100%{ opacity: 1; } 50%{ opacity: 0.45; } }
+  @media (prefers-reduced-motion: reduce){ .bar{ animation: none; } }
+
+  /* ---------- the door ---------- */
+  .signin{
+    position: relative; overflow: hidden;
+    min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 0 22px calc(44px + var(--safe-b));
+  }
+  @supports (min-height: 100dvh){ .signin{ min-height: 100dvh; } }
+
+  /* three soft lights, so the empty half of the screen is not just empty */
+  .signin-art{ position: absolute; inset: 0; pointer-events: none; }
+  .signin-art .orb{ position: absolute; border-radius: 50%; filter: blur(58px); opacity: 0.45; }
+  .orb-a{ width: 280px; height: 280px; top: -60px; left: -70px; background: var(--signal); }
+  .orb-b{ width: 240px; height: 240px; top: 14%; right: -90px; background: var(--brand-2); opacity: 0.30; }
+  .orb-c{ width: 320px; height: 320px; top: 32%; left: 10%; background: var(--c-air); opacity: 0.24; }
+  :root[data-theme="dark"] .signin-art .orb{ opacity: 0.32; }
+
+  .signin-main{ position: relative; }
+  .signin .brand{ font-size: 38px; margin: 0 0 26px; }
+  .kakao{
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    width: 100%; padding: 17px 20px;
+    background: #FEE500; color: rgba(0, 0, 0, 0.85);
+    border: none; border-radius: 16px;
+    font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+  }
+  .kakao-mark{ width: 21px; height: 21px; display: block; }
+  .kakao:hover{ filter: brightness(0.97); }
+  .kakao:focus-visible{ outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  /* ---------- nothing here yet ---------- */
+  /* 이름을 "blankstate"로 둔 이유: 짧은 .empty는 "값이 비었다"는 뜻으로 여기저기
+     붙어 다니는 말이라, 이 큰 여백이 엉뚱한 칸에 두 번이나 먹었다. */
+  .blankstate{ text-align: center; padding: 34px 6px 10px; }
+  .blankstate-mark{
+    width: 60px; height: 60px; margin: 0 auto 18px;
+    border-radius: 20px; display: flex; align-items: center; justify-content: center;
+    background: var(--signal-soft); color: var(--signal);
+  }
+  .blankstate-mark .icon{ width: 28px; height: 28px; }
+  .blankstate h2{ font-size: 18px; font-weight: 700; margin: 0 0 22px; letter-spacing: -0.02em; }
+  .blankstate p{ font-size: 13px; color: var(--ink-soft); margin: 0 0 22px; word-break: keep-all; }
+  .blankstate .btn{ width: 100%; }
+  .btn-quiet{
+    background: transparent; color: var(--ink-soft);
+    border: 1px solid var(--line-strong); margin-top: 8px;
+  }

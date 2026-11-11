@@ -1,32 +1,47 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>부동산 매물 호가 모니터링</title>
-  <style>
-    body { font-family: -apple-system, "Noto Sans KR", sans-serif; margin: 0; background: #f5f6f8; color: #222; }
-    header { background: #1f3a5f; color: #fff; padding: 16px 20px; }
-    main { max-width: 960px; margin: 20px auto; padding: 0 16px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid #e3e5e8; text-align: left; }
-    th { background: #eef1f5; }
-    .empty { text-align: center; color: #888; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F4F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1016" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BEMSTATE">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>BEMSTATE</title>
+<meta name="description" content="BEMSTATE — 관심 단지의 호가를 하루 두 번 기록합니다.">
+<!-- The web fonts must never hold up the first paint: the stack falls back to
+     the system font, and the page swaps when they arrive. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap"></noscript>
+<link rel="stylesheet" href="style/core.css">
+<link rel="stylesheet" href="style/estate.css">
 </head>
 <body>
-  <header>
-    <h1>부동산 매물 호가 모니터링</h1>
-  </header>
-  <main>
-    <table>
-      <thead>
-        <tr><th>단지명</th><th>면적(㎡)</th><th>층</th><th>호가(만원)</th><th>변동</th><th>확인일</th></tr>
-      </thead>
-      <tbody>
-        <tr><td colspan="6" class="empty">등록된 매물이 없습니다.</td></tr>
-      </tbody>
-    </table>
-  </main>
+<div class="app">
+  <!-- The waiting state is written here, not drawn by script: it is on screen
+       with the first paint. The first real render replaces it. -->
+  <div id="view">
+    <div class="pad">
+      <div class="page-head"><div class="page-title"><h1 class="brand"><span class="brand-a">BEM</span><span class="brand-b">STATE</span></h1></div></div>
+      <div class="trip-list">
+        <div class="trip-card ghost">
+          <span class="bar bar-s"></span><span class="bar bar-m"></span><span class="bar bar-l"></span>
+        </div>
+        <div class="trip-card ghost">
+          <span class="bar bar-s"></span><span class="bar bar-m"></span><span class="bar bar-l"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="overlay"></div>
+<div class="toast" id="toast"></div>
+<script type="module" src="app.js"></script>
 </body>
 </html>

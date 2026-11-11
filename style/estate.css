@@ -1,0 +1,173 @@
+/* BEMSTATE의 화면. 부품(창 · 단추 · 카드 · 알림)은 core.css에 있고, 여기는
+   관심 단지 목록과 단지 하나의 화면만 다룬다. 색은 토큰에서만 온다. */
+
+/* 오르면 빨강, 내리면 파랑 — 한국 시세표의 약속이다 */
+:root{
+  --up: #C4352B;
+  --down: #1F5FD6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --up: #FF8F84; --down: #6AAEFF; }
+}
+:root[data-theme="dark"]{ --up: #FF8F84; --down: #6AAEFF; }
+
+/* ---------- the list ---------- */
+.page-head{ display: flex; align-items: center; gap: 4px; margin: 0 0 22px; }
+.page-title{ flex: 1; min-width: 0; }
+.page-title .brand{ font-size: 26px; }
+
+.trip-list{ display: flex; flex-direction: column; gap: 12px; }
+.trip-card{
+  position: relative;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 22px; overflow: hidden;
+  box-shadow: 0 1px 2px var(--shadow-soft), 0 8px 24px -16px var(--shadow);
+}
+.trip-open{
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column;
+  width: 100%; padding: 17px 16px 14px;
+  background: transparent; border: none; border-radius: 22px;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.trip-open:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+.trip-list .addcard{ width: 100%; margin: 0; }
+
+.watch-top{ display: flex; align-items: flex-start; gap: 10px; }
+.watch-id{ flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.watch-name{ font-size: 19px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; word-break: keep-all; }
+.sub-place{
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+  background: var(--surface-2);
+  padding: 3px 8px 3px 6px; border-radius: 8px;
+}
+.sub-pin{ width: 12px; height: 12px; color: var(--signal); flex-shrink: 0; }
+/* 평형이 그 카드의 이름표다 */
+.watch-type{
+  flex-shrink: 0; font-size: 11.5px; font-weight: 700; letter-spacing: -0.01em;
+  padding: 4px 10px; border-radius: 9px;
+  background: var(--signal-soft); color: var(--signal);
+}
+.watch-trade{
+  font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 8px;
+  background: var(--surface-2); color: var(--ink-soft);
+}
+
+.watch-mid{ display: flex; align-items: flex-end; gap: 12px; margin-top: 14px; }
+.watch-price{ flex: 1; min-width: 0; }
+.watch-price .lbl{ display: block; font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+.watch-price b{
+  display: block; font-size: 25px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.watch-price b.none{ font-size: 15px; font-weight: 600; color: var(--ink-faint); letter-spacing: -0.01em; }
+.spark{ flex-shrink: 0; width: 104px; height: 34px; overflow: visible; }
+.spark polyline{ fill: none; stroke: var(--ink-faint); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.spark circle{ fill: var(--signal); stroke: var(--surface); stroke-width: 2; }
+
+.watch-foot{
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.watch-foot b{ font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.watch-when{
+  margin-left: auto; font-size: 11px; padding: 2px 7px; border-radius: 7px;
+  background: var(--surface-2); color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+
+/* 달라진 만큼. 방향은 화살표가, 색은 그 다음에 말한다 */
+.chg{ font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-faint); }
+.chg.up{ color: var(--up); }
+.chg.down{ color: var(--down); }
+
+.store-note{ margin: 22px 0 0; font-size: 11px; color: var(--ink-faint); text-align: center; word-break: keep-all; }
+
+/* ---------- one watch ---------- */
+.hero{ padding: calc(var(--safe-t) + 16px) 18px 14px; }
+.hero-top{ display: flex; align-items: center; gap: 9px; }
+.hero-id{ flex: 1; min-width: 0; }
+.hero-back{ margin-left: -10px; margin-right: -2px; color: var(--ink-soft); }
+.hero-city{
+  font-size: 26px; font-weight: 800; letter-spacing: -0.04em;
+  margin: 0; line-height: 1.2; word-break: keep-all;
+}
+.hero-sub{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+.now{
+  margin-top: 16px; padding: 15px 16px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+}
+.now-label{
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--signal);
+}
+.now-label .now-when{ margin-left: auto; font-weight: 500; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.now-big{
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 5px;
+}
+.now-big b{ font-size: 32px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.now-big .chg{ font-size: 13.5px; }
+.now-stats{
+  display: flex; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--line);
+}
+.now-stats > div{ flex: 1 1 0; min-width: 0; }
+.now-stats .lbl{ display: block; font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+.now-stats b{ display: block; font-size: 14.5px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 1px; }
+
+/* ---------- the chart ---------- */
+.chart-card{ margin-top: 16px; }
+.chart-wrap{ position: relative; margin-top: 8px; touch-action: pan-y; }
+.chart{ display: block; width: 100%; overflow: visible; }
+.chart .grid{ stroke: var(--line); stroke-width: 1; }
+.chart .tick{ font-size: 10.5px; fill: var(--ink-faint); font-variant-numeric: tabular-nums; font-family: var(--sans); }
+.chart .line{ fill: none; stroke: var(--signal); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chart .dot{ fill: var(--signal); stroke: var(--surface); stroke-width: 2; }
+.chart .cross{ stroke: var(--line-strong); stroke-width: 1; }
+.chart-tip{
+  position: absolute; top: 0; pointer-events: none;
+  background: var(--toast-bg); border: 1px solid var(--line); border-radius: 11px;
+  box-shadow: 0 10px 24px -12px var(--shadow);
+  padding: 6px 10px; white-space: nowrap; z-index: 2;
+  font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+}
+.chart-tip b{ display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+
+/* ---------- which snapshot ---------- */
+.slotrow{ padding-top: 14px; scrollbar-width: none; }
+.slotrow .chip{ font-variant-numeric: tabular-nums; }
+
+/* ---------- the 호가 list ---------- */
+.ask{ display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+.card-head + .ask{ border-top: none; padding-top: 6px; }
+.ask-price{
+  flex: 0 0 auto; min-width: 86px;
+  font-size: 15px; font-weight: 700; letter-spacing: -0.025em; font-variant-numeric: tabular-nums;
+}
+.ask-body{ flex: 1; min-width: 0; }
+.ask-body b{ display: block; font-size: 13.5px; font-weight: 600; }
+.ask-body small{
+  display: block; font-size: 12px; color: var(--ink-soft); margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ask-mark{ flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding-top: 1px; }
+.badge.new{ background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); font-weight: 700; }
+.card.gone .ask-price, .card.gone .ask-body b{ color: var(--ink-faint); text-decoration: line-through; }
+.card.gone{ --accent: var(--ink-faint); }
+
+/* ---------- adding a watch ---------- */
+.found{
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: none; border-top: 1px solid var(--line); background: transparent; color: inherit;
+  font: inherit; text-align: left; padding: 12px 2px; cursor: pointer;
+}
+.found:first-child{ border-top: none; }
+.found .rowbody small{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.found > .icon{ width: 16px; height: 16px; color: var(--ink-faint); }
+.chosen{
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 11px 8px 11px 14px; margin-bottom: 16px;
+}
+.pick .pick-n{ margin-left: 5px; font-weight: 500; opacity: 0.7; font-variant-numeric: tabular-nums; }

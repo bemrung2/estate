@@ -1,0 +1,18 @@
+{
+  "crons": [
+    { "path": "/api/collect", "schedule": "0 15 * * *" },
+    { "path": "/api/collect", "schedule": "0 3 * * *" }
+  ],
+  "functions": {
+    "api/collect.js": { "maxDuration": 60 },
+    "api/watch.js": { "maxDuration": 30 }
+  },
+  "headers": [
+    {
+      "source": "/(.*\\.html)?",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
+  ]
+}
