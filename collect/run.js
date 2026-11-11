@@ -1,18 +1,23 @@
 /*
- * One round of collecting: every watched 단지 · 평형 gets a snapshot for the
- * current slot.
+ * One round of collecting: every watched 단지 · 평형 gets today's snapshot —
+ * the asking prices from every platform that answered, in one list — and its
+ * recent 실거래가.
  *
- * It is safe to run twice — a snapshot is keyed by (watch, slot), so a second
- * run in the same half-day replaces the first rather than adding to it.
+ * It is safe to run twice, and from two places. A snapshot is keyed by
+ * (watch, day); a platform that answers replaces its own listings in it, and a
+ * platform that does not answer leaves what an earlier run recorded. So the
+ * scheduled run can record 직방 while a run at home adds 네이버 to the same day.
  */
-const SOURCES = { zigbang: require("./zigbang.js"), naver: require("./naver.js") };
+const zigbang = require("./zigbang.js");
+const naver = require("./naver.js");
+const molit = require("./molit.js");
 
+const PLATFORMS = { zigbang, naver };
 const KST = 9 * 3600 * 1000;
 
-/* the half-day `when` falls in, in Korean time: "2026-11-11T00" | "…T12" */
+/* the day `when` falls in, in Korean time: "2026-11-11" */
 function slotOf(when) {
-  const k = new Date((when || new Date()).getTime() + KST);
-  return k.toISOString().slice(0, 10) + (k.getUTCHours() < 12 ? "T00" : "T12");
+  return new Date((when || new Date()).getTime() + KST).toISOString().slice(0, 10);
 }
 
 function stats(listings) {
@@ -28,52 +33,96 @@ function stats(listings) {
 }
 
 const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+const why = (e) => String((e && e.message) || e).slice(0, 200);
 
-/*
- * opts.only         collect just these watch ids
- * opts.onlyMissing  leave a watch alone if this slot already has its snapshot
- *                   (a newly added watch gets its first numbers right away,
- *                   without overwriting what the schedule recorded)
- */
+/* what is stored of one listing */
+function keep(l) {
+  return { src: l.src, id: l.id, item: l.item, price: l.price, dong: l.dong, floor: l.floor, title: l.title, n: l.n };
+}
+
+/* opts.only  collect just these watch ids */
 async function run(data, opts) {
   opts = opts || {};
   const slot = slotOf(opts.now);
   let watches = await data.watches();
   if (opts.only) watches = watches.filter((w) => opts.only.indexOf(w.id) >= 0);
 
-  /* one request per 단지 · 거래 — its 평형s are split out of the same answer */
+  /* one request per 단지 · 거래 and platform — its 평형s are split out of the same answer */
   const groups = {};
-  for (const w of watches) {
-    if (opts.onlyMissing && (await data.snapshot(w.id, slot))) continue;
-    const key = [w.source, w.complex_id, w.trade].join("|");
+  watches.forEach((w) => {
+    const key = [w.complex_id, w.trade].join("|");
     (groups[key] = groups[key] || []).push(w);
-  }
+  });
 
-  const report = { slot, saved: 0, failed: [] };
+  const report = { slot, saved: 0, deals: molit.enabled() ? 0 : "MOLIT_SERVICE_KEY 없음", failed: [] };
+  const cache = {};
   let first = true;
   for (const key of Object.keys(groups)) {
     const group = groups[key];
     const head = group[0];
+    if (!first) await pause(400);          /* 남의 서버다 — 몰아치지 않는다 */
+    first = false;
+
+    const got = {};                        /* platform → listings, for the ones that answered */
+    const state = {};
     try {
-      const source = SOURCES[head.source];
-      if (!source) throw new Error("unknown source " + head.source);
-      if (!first) await pause(400);          /* 남의 서버다 — 몰아치지 않는다 */
-      first = false;
-      const cat = await source.catalog(head.complex_id, head.trade);
+      got.zigbang = (await zigbang.catalog(head.complex_id, head.trade)).listings;
+      state.zigbang = "ok";
+    } catch (e) {
+      state.zigbang = "fail";
+      report.failed.push({ complex: head.complex_name, source: "직방", error: why(e) });
+    }
+    const naverId = (group.find((w) => w.naver_id) || {}).naver_id;
+    if (naverId) {
+      try {
+        got.naver = (await naver.catalog(naverId, head.trade)).listings;
+        state.naver = "ok";
+      } catch (e) {
+        state.naver = "fail";
+        report.failed.push({ complex: head.complex_name, source: "네이버 부동산", error: why(e) });
+      }
+    }
+
+    if (Object.keys(got).length) {
       const taken = new Date().toISOString();
       for (const w of group) {
-        const listings = cat.listings
-          .filter((l) => l.type === w.room_type_id)
-          .map(({ type, complexName, ...rest }) => rest)
-          .sort((a, b) => a.price - b.price);
-        await data.putSnapshot({ watch_id: w.id, slot, taken_at: taken, ...stats(listings), listings });
+        const before = await data.snapshot(w.id, slot);
+        const sources = Object.assign({}, before && before.sources);
+        let listings = [];
+        Object.keys(PLATFORMS).forEach((src) => {
+          if (got[src]) {
+            const mine = src === "zigbang"
+              ? got[src].filter((l) => l.type === w.room_type_id)
+              : got[src].filter((l) => naver.sameType(l, w));
+            listings = listings.concat(mine.map(keep));
+            sources[src] = "ok";
+          } else {
+            /* 이번에 답하지 않은 곳은 오늘 먼저 받아둔 것을 그대로 둔다 */
+            const kept = ((before && before.listings) || []).filter((l) => (l.src || "zigbang") === src);
+            listings = listings.concat(kept);
+            if (state[src] && !kept.length && sources[src] !== "ok") sources[src] = "fail";
+          }
+        });
+        listings.sort((a, b) => a.price - b.price);
+        await data.putSnapshot({ watch_id: w.id, slot, taken_at: taken, ...stats(listings), listings, sources });
         report.saved++;
       }
-    } catch (e) {
-      report.failed.push({ complex: head.complex_name, error: String(e.message || e).slice(0, 200) });
+    }
+
+    if (molit.enabled()) {
+      try {
+        const found = await molit.deals(group, cache);
+        for (const w of group) {
+          if (!found || !found[w.id]) continue;
+          await data.patchWatch(w.id, { deals: molit.merge(w.deals, found[w.id]), deals_at: new Date().toISOString() });
+          report.deals += found[w.id].length;
+        }
+      } catch (e) {
+        report.failed.push({ complex: head.complex_name, source: "실거래가", error: why(e) });
+      }
     }
   }
   return report;
 }
 
-module.exports = { run, slotOf, stats, SOURCES };
+module.exports = { run, slotOf, stats, PLATFORMS };

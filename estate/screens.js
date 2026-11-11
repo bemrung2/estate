@@ -4,31 +4,29 @@ import { el, esc, icon, ripple, toast, toastDone } from "../ui/dom.js";
 import { Store } from "../ui/store.js";
 import { themeButton } from "../ui/theme.js";
 import { brandMark, pageFooter } from "../ui/shell.js";
-import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag } from "../ui/sheet.js";
-import { won, delta, slotLabel, slotShort, floorLabel } from "./format.js";
-import { sparkline, lineChart } from "./chart.js";
+import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag, openTextDialog } from "../ui/sheet.js";
+import { won, delta, slotLabel, slotShort, dayShort, floorLabel, PLATFORM,
+         listingUrl, hogangnonoUrl, naverComplexUrl, naverSearchUrl } from "./format.js";
+import { sparkline, flowChart, flowLegend } from "./chart.js";
 
 var nav = { go: function(){}, set: function(){}, reload: function(){} };
 export function wire(n){ nav = n; }
 
 var TRADE = { trade: "매매", charter: "전세" };
 
-/* +3 · −2 · 그대로 */
-function chg(now, before, unit){
+function chg(now, before){
   if (now == null || before == null) return "";
   var d = now - before;
   if (!d) return '<span class="chg">변동 없음</span>';
-  return '<span class="chg ' + (d > 0 ? "up" : "down") + '">' + (d > 0 ? "▲ " : "▼ ") +
-    (unit === "count" ? Math.abs(d) + "건" : won(Math.abs(d))) + '</span>';
-}
-
-function sourceName(key){
-  var s = Store.sources.filter(function(x){ return x.key === key; })[0];
-  return s ? s.name : key;
+  return '<span class="chg ' + (d > 0 ? "up" : "down") + '">' + delta(d) + '</span>';
 }
 
 function place(address){
   return address ? '<span class="sub-place">' + icon("pin", "sub-pin") + esc(address) + '</span>' : "";
+}
+
+function outlink(label, url){
+  return '<a class="outlink" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label) + icon("out") + '</a>';
 }
 
 /* ---------- the list ---------- */
@@ -49,7 +47,7 @@ export function renderList(view){
   if (!Store.watches.length){
     var blank = el('<div class="blankstate"><div class="blankstate-mark">' + icon("pin") + '</div>' +
       '<h2>관심 단지가 아직 없습니다</h2>' +
-      '<p>단지와 평형을 등록하면 매일 00시와 12시에 그때의 호가 목록을 기록합니다.</p>' +
+      '<p>단지와 평형을 등록하면 매일 낮 12시에 그날의 호가 목록을 기록합니다.</p>' +
       '<button class="btn btn-primary" type="button">' + icon("plus") + '관심 단지 추가</button></div>');
     ripple(blank.querySelector(".btn"), openAdd);
     pad.appendChild(blank);
@@ -59,7 +57,7 @@ export function renderList(view){
     ripple(add, openAdd);
     list.appendChild(add);
     pad.appendChild(list);
-    pad.appendChild(el('<p class="store-note">매일 00시 · 12시에 기록합니다</p>'));
+    pad.appendChild(el('<p class="store-note">매일 낮 12시에 기록합니다</p>'));
   }
   pad.appendChild(pageFooter());
   swap(view, pad);
@@ -75,6 +73,7 @@ function watchCard(w){
   var series = Store.series[w.id] || [];
   var last = series[series.length - 1];
   var prev = series[series.length - 2];
+  var deal = w.last_deal;
   var card = el('<div class="trip-card"><button class="trip-open" type="button">' +
     '<div class="watch-top"><div class="watch-id">' +
       '<span class="watch-name">' + esc(w.complex_name) + '</span>' + place(w.address) +
@@ -83,10 +82,11 @@ function watchCard(w){
       (last && last.min_price != null
         ? '<b>' + won(last.min_price) + '</b>'
         : '<b class="none">' + (last ? "매물 없음" : "아직 기록이 없습니다") + '</b>') +
+      (deal ? '<span class="watch-deal">최근 실거래 <b>' + won(deal.price) + '</b> · ' + dayShort(deal.date) + '</span>' : '') +
     '</div>' + sparkline(series.map(function(s){ return s.min_price; })) + '</div>' +
     (last ? '<div class="watch-foot"><span>매물 <b>' + last.count + '</b>건</span>' +
       (prev ? chg(last.min_price, prev.min_price) : "") +
-      '<span class="watch-when">' + esc(sourceName(w.source)) + ' · ' + slotShort(last.slot) + '</span></div>' : "") +
+      '<span class="watch-when">' + slotShort(last.slot) + '</span></div>' : "") +
     '</button></div>');
   ripple(card.querySelector(".trip-open"), function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
   return card;
@@ -104,9 +104,15 @@ export function renderWatch(view, id, slot){
     '<div class="hero-id"><h1 class="hero-city">' + esc(w.complex_name) + '</h1></div></div>' +
     '<div class="hero-sub">' + place(w.address) +
       '<span class="watch-type">' + esc(w.room_label) + '</span>' +
-      '<span class="watch-trade">' + TRADE[w.trade] + '</span>' +
-      '<span class="watch-trade">' + esc(sourceName(w.source)) + '</span></div></div>');
+      '<span class="watch-trade">' + TRADE[w.trade] + '</span></div>' +
+    '<div class="hero-sub links">' + outlink("호갱노노", hogangnonoUrl(w.complex_name)) +
+      (w.naver_id ? outlink("네이버 부동산", naverComplexUrl(w.naver_id)) : '') + '</div></div>');
   ripple(hero.querySelector(".hero-back"), function(){ nav.go("/"); });
+  if (!w.naver_id){
+    var link = el('<button class="outlink" type="button">네이버 연결' + icon("plus") + '</button>');
+    ripple(link, function(){ openNaverLink(w); });
+    hero.querySelector(".links").appendChild(link);
+  }
   page.appendChild(hero);
   var body = el('<div><div class="card"><span class="bar bar-s"></span><span class="bar bar-m"></span>' +
     '<span class="bar bar-l"></span></div></div>');
@@ -116,16 +122,18 @@ export function renderWatch(view, id, slot){
   Store.history(id).then(function(data){
     if (mine !== shown || !data) return;
     var history = data.history || [];
+    var full = data.watch || w;
     body.innerHTML = "";
     if (!history.length){
       body.appendChild(el('<div class="card dashed"><p class="card-empty">아직 기록이 없습니다. ' +
-        '다음 00시 또는 12시에 첫 기록이 남습니다.</p></div>'));
+        '다음 낮 12시에 첫 기록이 남습니다.</p></div>'));
+      body.appendChild(dealsCard(full));
       body.appendChild(removeFoot(w));
       return;
     }
     var at = history.length - 1;
     history.forEach(function(s, i){ if (s.slot === slot) at = i; });
-    paintWatch(body, hero, w, history, at, mine);
+    paintWatch(body, hero, full, history, at, mine);
   }).catch(function(e){
     if (mine !== shown) return;
     body.innerHTML = "";
@@ -134,10 +142,18 @@ export function renderWatch(view, id, slot){
   });
 }
 
+function liveDeals(w){ return (w.deals || []).filter(function(d){ return !d.canceled; }); }
+
 function paintWatch(body, hero, w, history, at, mine){
   var snap = history[at], before = history[at - 1];
+  var deal = liveDeals(w)[0];
   var old = hero.querySelector(".now");
   if (old) old.remove();
+  var gap = "";
+  if (deal && snap.min_price != null){
+    var d = snap.min_price - deal.price;
+    gap = '<span class="gap">최저 호가가 ' + (d ? won(Math.abs(d)) + (d > 0 ? " 높음" : " 낮음") : "같음") + '</span>';
+  }
   hero.appendChild(el('<div class="now">' +
     '<div class="now-label">' + TRADE[w.trade] + ' 최저 호가<span class="now-when">' + slotLabel(snap.slot) + '</span></div>' +
     '<div class="now-big"><b>' + won(snap.min_price) + '</b>' + (before ? chg(snap.min_price, before.min_price) : "") + '</div>' +
@@ -145,24 +161,26 @@ function paintWatch(body, hero, w, history, at, mine){
       '<div><span class="lbl">중간</span><b>' + won(snap.med_price) + '</b></div>' +
       '<div><span class="lbl">최고</span><b>' + won(snap.max_price) + '</b></div>' +
       '<div><span class="lbl">매물</span><b>' + snap.count + '건</b></div>' +
-    '</div></div>'));
+    '</div>' +
+    (deal ? '<div class="now-deal"><span class="lbl">최근 실거래</span><b>' + won(deal.price) + '</b>' +
+      '<span>' + [floorLabel(deal.floor), dayShort(deal.date)].filter(Boolean).join(" · ") + '</span>' + gap + '</div>' : '') +
+    '</div>'));
 
   body.innerHTML = "";
   function pick(i){
     nav.set("/w/" + encodeURIComponent(w.id) + (i === history.length - 1 ? "" : "/" + history[i].slot));
   }
 
-  /* 추이. 점 하나로는 선이 되지 않으니 두 번째 기록부터 그린다 */
-  if (history.length > 1){
-    var chart = el('<div class="card chart-card"><div class="card-head"><h3>최저 호가 추이' +
-      '<span class="card-n">' + history.length + '회</span></h3></div></div>');
-    chart.appendChild(lineChart(history.map(function(s){
-      return { label: slotLabel(s.slot), short: slotShort(s.slot), value: s.min_price };
-    }), at, pick));
-    body.appendChild(chart);
-  }
+  /* 호가 흐름 — 그날그날 호가가 걸쳐 있던 폭과 실거래를 한 그림에 */
+  var chart = el('<div class="card chart-card"><div class="card-head"><h3>호가 흐름' +
+    '<span class="card-n">' + history.length + '일</span></h3></div></div>');
+  chart.appendChild(flowChart(history.map(function(s){
+    return { slot: s.slot, label: slotLabel(s.slot), min: s.min_price, med: s.med_price, max: s.max_price, count: s.count };
+  }), w.deals, at, pick));
+  chart.appendChild(flowLegend(liveDeals(w).length > 0));
+  body.appendChild(chart);
 
-  /* 어느 기록을 볼지 — 최근 것이 앞에 */
+  /* 어느 날을 볼지 — 최근 것이 앞에 */
   var row = el('<div class="chiprow slotrow"></div>');
   for (var i = history.length - 1; i >= 0; i--){
     (function(i){
@@ -178,23 +196,28 @@ function paintWatch(body, hero, w, history, at, mine){
     '<span class="card-n">' + snap.count + '건</span></h3></div>' +
     '<p class="card-empty">불러오는 중…</p></div>');
   body.appendChild(list);
+  body.appendChild(dealsCard(w));
   body.appendChild(removeFoot(w));
 
   Store.snapshot(w.id, snap.slot).then(function(data){
     if (mine !== shown || !data || !list.parentNode) return;
     list.querySelector(".card-empty").remove();
+    var key = function(l){ return (l.src || "zigbang") + ":" + l.id; };
     var now = (data.snapshot && data.snapshot.listings) || [];
     var was = data.previous ? data.previous.listings || [] : null;
-    var wasBy = {};
-    (was || []).forEach(function(l){ wasBy[l.id] = l; });
-    var nowBy = {};
-    now.forEach(function(l){ nowBy[l.id] = l; });
+    var wasBy = {}, nowBy = {};
+    (was || []).forEach(function(l){ wasBy[key(l)] = l; });
+    now.forEach(function(l){ nowBy[key(l)] = l; });
+    /* 어제는 받지 못한 곳의 매물을 오늘 '신규'라 부르면 거짓말이다 */
+    var hadSrc = {};
+    (was || []).forEach(function(l){ hadSrc[l.src || "zigbang"] = true; });
+    var nowSrc = {};
+    now.forEach(function(l){ nowSrc[l.src || "zigbang"] = true; });
 
-    if (!now.length) list.appendChild(el('<p class="card-empty">이때는 올라온 매물이 없었습니다.</p>'));
+    if (!now.length) list.appendChild(el('<p class="card-empty">이날은 올라온 매물이 없었습니다.</p>'));
     now.forEach(function(l){
-      var mark = "";
-      if (was){
-        var o = wasBy[l.id];
+      var mark = "", o = wasBy[key(l)];
+      if (was && hadSrc[l.src || "zigbang"]){
         if (!o) mark = '<span class="badge new">신규</span>';
         else if (o.price !== l.price) mark = '<span class="chg ' + (l.price > o.price ? "up" : "down") + '">' +
           delta(l.price - o.price) + '</span>';
@@ -202,11 +225,16 @@ function paintWatch(body, hero, w, history, at, mine){
       list.appendChild(askRow(l, mark));
     });
 
-    var gone = (was || []).filter(function(l){ return !nowBy[l.id]; });
+    var sources = (data.snapshot && data.snapshot.sources) || {};
+    var failed = Object.keys(sources).filter(function(k){ return sources[k] === "fail"; });
+    if (failed.length) list.appendChild(el('<p class="src-note">' +
+      failed.map(function(k){ return PLATFORM[k] || k; }).join(" · ") + ' 매물은 이날 받지 못했습니다.</p>'));
+
+    var gone = (was || []).filter(function(l){ return !nowBy[key(l)] && nowSrc[l.src || "zigbang"]; });
     if (gone.length){
       var card = el('<div class="card dashed gone"><div class="card-head"><h3>직전 기록 이후 빠진 매물' +
         '<span class="card-n">' + gone.length + '건</span></h3></div></div>');
-      gone.forEach(function(l){ card.appendChild(askRow(l, "")); });
+      gone.forEach(function(l){ card.appendChild(askRow(l, "", true)); });
       list.parentNode.insertBefore(card, list.nextSibling);
     }
   }).catch(function(e){
@@ -216,19 +244,51 @@ function paintWatch(body, hero, w, history, at, mine){
   });
 }
 
-function askRow(l, mark){
+/* 매물 한 줄. 누르면 그 매물을 올린 곳의 화면이 새 창으로 열린다 —
+   빠진 매물은 갈 곳이 없으니 줄만 남는다. */
+function askRow(l, mark, dead){
+  var src = l.src || "zigbang";
   var where = [l.dong, floorLabel(l.floor)].filter(Boolean).join(" · ");
-  return el('<div class="ask"><span class="ask-price">' + won(l.price) + '</span>' +
-    '<span class="ask-body"><b>' + esc(where || "동 · 층 미상") + '</b>' +
+  var url = dead ? "" : listingUrl(l);
+  var inner = '<span class="ask-price">' + won(l.price) + '</span>' +
+    '<span class="ask-body"><b>' + esc(where || "동 · 층 미상") +
+      '<span class="badge src ' + src + '">' + esc(PLATFORM[src] || src) + '</span></b>' +
       (l.title ? '<small>' + esc(l.title) + '</small>' : '') + '</span>' +
     '<span class="ask-mark">' + mark +
-      (l.n > 1 ? '<span class="badge">중개 ' + l.n + '곳</span>' : '') + '</span></div>');
+      (l.n > 1 ? '<span class="badge">중개 ' + l.n + '곳</span>' : '') + '</span>';
+  return el(url
+    ? '<a class="ask" href="' + esc(url) + '" target="_blank" rel="noopener">' + inner + '</a>'
+    : '<div class="ask">' + inner + '</div>');
+}
+
+function dealsCard(w){
+  var deals = w.deals || [];
+  var card = el('<div class="card t-deal" style="margin-top:12px"><div class="card-head"><h3>최근 실거래' +
+    (deals.length ? '<span class="card-n">' + deals.length + '건</span>' : '') + '</h3></div></div>');
+  if (!deals.length){
+    card.appendChild(el('<p class="card-empty">' + (Store.deals
+      ? (w.exclusive_m2 ? "최근 석 달 안에 신고된 거래가 없습니다." : "이 평형의 전용 면적을 몰라 실거래를 가려낼 수 없습니다.")
+      : "실거래가 인증키(MOLIT_SERVICE_KEY)를 넣으면 국토교통부 실거래가를 함께 보여줍니다.") + '</p>'));
+    return card;
+  }
+  deals.slice(0, 10).forEach(function(d){
+    card.appendChild(el('<div class="deal-row' + (d.canceled ? " off" : "") + '"><b>' + won(d.price) + '</b>' +
+      '<span>' + esc(floorLabel(d.floor) || "층 미상") + (d.canceled ? " · 해제" : "") + '</span>' +
+      '<span class="when">' + d.date.slice(2).replace(/-/g, ".") + '</span></div>'));
+  });
+  card.appendChild(el('<p class="src-note">국토교통부 실거래가 공개시스템 · 전용 ' + esc(String(w.exclusive_m2)) + '㎡</p>'));
+  return card;
 }
 
 function removeFoot(w){
-  var foot = el('<div class="dangerfoot"><button class="linkbtn danger" type="button">' +
-    icon("trash") + '관심 해제</button></div>');
-  ripple(foot.querySelector("button"), function(){
+  var foot = el('<div class="dangerfoot"></div>');
+  if (w.naver_id){
+    var relink = el('<button class="linkbtn" type="button">' + icon("link") + '네이버 연결 바꾸기</button>');
+    ripple(relink, function(){ openNaverLink(w); });
+    foot.appendChild(relink);
+  }
+  var off = el('<button class="linkbtn danger" type="button">' + icon("trash") + '관심 해제</button>');
+  ripple(off, function(){
     askThenDelete(w.complex_name + " " + w.room_label, function(){
       Store.post({ remove: w.id }).then(function(){ return nav.reload(); })
         .catch(function(e){ toast("해제하지 못했습니다 — " + e.message, true); });
@@ -236,7 +296,28 @@ function removeFoot(w){
       return null;
     });
   });
+  foot.appendChild(off);
   return foot;
+}
+
+/* 네이버 부동산의 그 단지를 잇는다. 같은 단지의 다른 평형에도 함께 걸린다. */
+function openNaverLink(w){
+  openTextDialog({
+    title: "네이버 부동산 연결",
+    value: w.naver_id ? naverComplexUrl(w.naver_id) : "",
+    placeholder: "https://new.land.naver.com/complexes/…",
+    hint: "네이버 부동산에서 이 단지를 열고 주소를 붙여넣어 주세요. 단지 번호만 적어도 됩니다.",
+    okLabel: "연결"
+  }, function(value){
+    Store.post({ link: { complexId: w.complex_id, naver: value } }).then(function(data){
+      if (!data) return;
+      var bad = data.first && (data.first.failed || []).filter(function(f){ return /네이버/.test(f.source || ""); })[0];
+      if (bad) toast("연결했습니다. 다만 지금은 네이버 매물을 받지 못했습니다 — " + bad.error, true);
+      else toastDone("네이버 부동산을 연결했습니다.");
+      nav.reload();
+    }).catch(function(e){ toast("연결하지 못했습니다 — " + e.message, true); });
+    return null;
+  });
 }
 
 /* ---------- adding a watch ---------- */
@@ -248,21 +329,14 @@ function openAdd(){
   foot.appendChild(save);
   foot.hidden = true;
 
-  var source = Store.sources[0], chosen = null, trade = "trade", types = [], picked = {};
+  var chosen = null, trade = "trade", types = [], picked = {}, naverInput = null;
   var asked = 0;
 
   function stepSearch(){
     chosen = null; foot.hidden = true;
     body.innerHTML = "";
-    var src = el('<div class="fld"><label>출처</label><div class="pickrow"></div></div>');
-    pickGroup(src.querySelector(".pickrow"),
-      Store.sources.map(function(x){ return { key: x.key, label: x.name }; }),
-      function(){ return source.key; },
-      function(k){ source = Store.sources.filter(function(x){ return x.key === k; })[0]; stepSearch(); });
-    body.appendChild(src);
-    var fld = el('<div class="fld"><label for="q">' + esc(source.ask.label) + '</label>' +
-      '<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="' +
-      esc(source.ask.placeholder) + '"></div>');
+    var fld = el('<div class="fld"><label for="q">단지 이름</label>' +
+      '<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="예: 헬리오시티"></div>');
     var out = el('<div></div>');
     body.appendChild(fld);
     body.appendChild(out);
@@ -272,7 +346,7 @@ function openAdd(){
       if (q.length < 2){ out.innerHTML = ""; return; }
       var mine = ++asked;
       out.innerHTML = '<p class="card-empty">찾는 중…</p>';
-      Store.search(source.key, q).then(function(data){
+      Store.search(q).then(function(data){
         if (mine !== asked || !data) return;
         out.innerHTML = "";
         if (!data.complexes.length){
@@ -303,7 +377,7 @@ function openAdd(){
     body.innerHTML = "";
     picked = {};
     var top = el('<div class="chosen"><span class="rowbody"><b>' + esc(chosen.name) + '</b>' +
-      '<small>' + esc(source.name + " · " + chosen.address) + '</small></span>' +
+      '<small>' + esc(chosen.address) + '</small></span>' +
       '<button class="quietbtn" type="button">다시 찾기</button></div>');
     ripple(top.querySelector("button"), stepSearch);
     body.appendChild(top);
@@ -311,40 +385,62 @@ function openAdd(){
     var tr = el('<div class="fld"><label>거래</label><div class="pickrow"></div></div>');
     pickGroup(tr.querySelector(".pickrow"),
       Object.keys(TRADE).map(function(k){ return { key: k, label: TRADE[k] }; }),
-      function(){ return trade; }, function(k){ trade = k; loadTypes(); });
+      function(){ return trade; }, function(k){ trade = k; paintTypes(); });
     body.appendChild(tr);
 
-    var tf = el('<div class="fld"><label>평형 <span class="opt">여럿 고를 수 있음</span></label>' +
-      '<div class="pickrow" id="types"></div><p class="fld-hint">숫자는 지금 올라와 있는 매물 수입니다.</p></div>');
-    body.appendChild(tf);
-    foot.hidden = false;
-    loadTypes();
-  }
+    body.appendChild(el('<div class="fld"><label>평형 <span class="opt">여럿 고를 수 있음</span></label>' +
+      '<div class="pickrow" id="types"><p class="card-empty">평형을 불러오는 중…</p></div>' +
+      '<p class="fld-hint">숫자는 지금 직방에 올라와 있는 매물 수입니다.</p></div>'));
 
-  function loadTypes(){
-    var row = body.querySelector("#types");
-    var mine = ++asked;
-    picked = {};
-    row.innerHTML = '<p class="card-empty">평형을 불러오는 중…</p>';
-    Store.types(source.key, chosen.id, trade).then(function(data){
-      if (mine !== asked || !data) return;
+    /* 네이버 부동산은 단지 번호가 따로다. 먼저 이름으로 찾아보고, 안 되면 붙여넣게 한다. */
+    var nv = el('<div class="fld"><label for="nv">네이버 부동산 단지 <span class="opt">선택</span></label>' +
+      '<input id="nv" type="url" inputmode="url" autocomplete="off" placeholder="찾는 중…">' +
+      '<p class="fld-hint">찾는 중…</p></div>');
+    body.appendChild(nv);
+    naverInput = nv.querySelector("input");
+    var hint = nv.querySelector(".fld-hint");
+    var manual = '네이버 부동산에서 <a href="' + esc(naverSearchUrl(chosen.name)) +
+      '" target="_blank" rel="noopener">이 단지를 열고</a> 그 주소를 붙여넣으면 네이버 매물도 함께 기록합니다.';
+    var mine = asked;
+    Store.findNaver(chosen.name).then(function(data){
+      if (mine !== asked && !naverInput.isConnected) return;
+      naverInput.placeholder = "https://new.land.naver.com/complexes/…";
+      if (data && data.naverId && !naverInput.value){
+        naverInput.value = naverComplexUrl(data.naverId);
+        hint.innerHTML = '이름으로 찾은 단지입니다. <a href="' + esc(naverComplexUrl(data.naverId)) +
+          '" target="_blank" rel="noopener">맞는지 열어 보기</a>';
+      } else hint.innerHTML = "자동으로 찾지 못했습니다. " + manual;
+    }).catch(function(){
+      naverInput.placeholder = "https://new.land.naver.com/complexes/…";
+      hint.innerHTML = manual;
+    });
+
+    foot.hidden = false;
+    var asking = ++asked;
+    Store.types(chosen.id).then(function(data){
+      if (asking !== asked || !data) return;
       types = data.types;
-      row.innerHTML = "";
-      if (!types.length) row.appendChild(el('<p class="card-empty">평형 정보를 찾지 못했습니다.</p>'));
-      types.forEach(function(t){
-        var b = el('<button class="pick" type="button" aria-pressed="false">' + esc(t.label) +
-          '<span class="pick-n">' + t.count + '</span></button>');
-        ripple(b, function(){
-          picked[t.id] = !picked[t.id];
-          b.setAttribute("aria-pressed", String(!!picked[t.id]));
-          row.classList.remove("bad");
-        });
-        row.appendChild(b);
-      });
+      paintTypes();
     }).catch(function(e){
-      if (mine !== asked) return;
+      if (asking !== asked) return;
+      var row = body.querySelector("#types");
       row.innerHTML = "";
       row.appendChild(el('<p class="card-empty"></p>')).textContent = "불러오지 못했습니다 — " + e.message;
+    });
+  }
+
+  function paintTypes(){
+    var row = body.querySelector("#types");
+    if (!row || !types.length) return;
+    row.innerHTML = "";
+    types.forEach(function(t){
+      var b = el('<button class="pick" type="button" aria-pressed="' + !!picked[t.id] + '">' + esc(t.label) +
+        '<span class="pick-n">' + ((t.count && t.count[trade]) || 0) + '</span></button>');
+      ripple(b, function(){
+        picked[t.id] = !picked[t.id];
+        b.setAttribute("aria-pressed", String(!!picked[t.id]));
+      });
+      row.appendChild(b);
     });
   }
 
@@ -352,19 +448,21 @@ function openAdd(){
     if (save.disabled) return;
     var want = types.filter(function(t){ return picked[t.id]; });
     if (!want.length) return flag(null, "평형을 하나 이상 골라 주세요.");
+    var nv = naverInput ? naverInput.value.trim() : "";
+    if (nv && !/(complex(es)?\/(info\/)?\d+|hscpNo=\d+|^\d+$)/.test(nv)){
+      return flag(naverInput, "네이버 부동산 단지 주소를 확인해 주세요.");
+    }
     save.disabled = true;
     save.textContent = "등록하는 중…";
     Store.post({ add: {
-      source: source.key, complexId: chosen.id, complexName: chosen.name,
-      address: chosen.address, trade: trade,
-      types: want.map(function(t){ return { id: t.id, label: t.label }; })
+      complexId: chosen.id, complexName: chosen.name, address: chosen.address, trade: trade, naver: nv,
+      types: want.map(function(t){ return { id: t.id, label: t.label, supply: t.supply, exclusive: t.exclusive }; })
     } }).then(function(data){
       if (!data){ save.disabled = false; save.textContent = "등록"; return; }
       closeOverlay();
       if (!data.added.length) toast("이미 등록된 평형입니다.");
-      else if (data.first && data.first.failed && data.first.failed.length){
-        toast("등록했습니다. 첫 기록은 다음 정각에 남습니다.", true);
-      } else toastDone("등록하고 첫 호가를 기록했습니다.");
+      else if (!data.first || !data.first.saved) toast("등록했습니다. 첫 기록은 다음 낮 12시에 남습니다.", true);
+      else toastDone("등록하고 첫 호가를 기록했습니다.");
       nav.reload();
     }).catch(function(e){
       save.disabled = false; save.textContent = "등록";

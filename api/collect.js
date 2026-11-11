@@ -1,6 +1,6 @@
 /*
- * The scheduled round. Vercel Cron calls this twice a day (vercel.json):
- * 00:00 and 12:00 Korean time.
+ * The scheduled round. Vercel Cron calls this once a day (vercel.json):
+ * 12:00 Korean time.
  *
  *   GET /api/collect      Authorization: Bearer <CRON_SECRET>
  *

@@ -15,7 +15,7 @@ export var Store = {
   /* "wait" · "ok" · "setup"(서버 설정이 덜 됨) · "down"(서버가 없거나 닿지 않음) */
   state: "wait",
   message: "",
-  sources: [],
+  deals: false,       /* 실거래가가 켜져 있는가 (MOLIT_SERVICE_KEY) */
   watches: [],
   series: {},
 
@@ -29,7 +29,7 @@ export var Store = {
         return;
       }
       this.state = "ok";
-      this.sources = data.sources || [];
+      this.deals = !!data.deals;
       this.watches = data.watches || [];
       this.series = data.series || {};
     }catch(e){
@@ -41,10 +41,9 @@ export var Store = {
   watch(id){ return this.watches.filter(function(w){ return w.id === id; })[0] || null; },
   history(id){ return ask("api/watch?id=" + encodeURIComponent(id)); },
   snapshot(id, slot){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=" + encodeURIComponent(slot)); },
-  search(source, q){ return ask("api/search?source=" + source + "&q=" + encodeURIComponent(q)); },
-  types(source, complexId, trade){
-    return ask("api/search?source=" + source + "&complex=" + encodeURIComponent(complexId) + "&trade=" + trade);
-  },
+  search(q){ return ask("api/search?q=" + encodeURIComponent(q)); },
+  types(complexId){ return ask("api/search?complex=" + encodeURIComponent(complexId)); },
+  findNaver(name){ return ask("api/search?naver=" + encodeURIComponent(name)); },
   post(body){
     return ask("api/watch", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)

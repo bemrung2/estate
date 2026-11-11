@@ -27,10 +27,12 @@ if (process.argv[2] === "collect") {
 }
 
 if (process.argv[2] === "probe") {
-  const source = require("./collect/run.js").SOURCES[process.argv[3]];
+  const source = require("./collect/run.js").PLATFORMS[process.argv[3]];
   if (!source || !process.argv[4]) { console.error("node dev.js probe <zigbang|naver> <단지 번호>"); process.exit(2); }
   source.catalog(process.argv[4], "trade").then((cat) => {
-    console.log("평형", cat.types);
+    const areas = {};
+    cat.listings.forEach((l) => { const k = l.type || (l.supply + " / " + l.exclusive); areas[k] = (areas[k] || 0) + 1; });
+    console.log("평형별 매물 수", areas);
     console.log("매물 " + cat.listings.length + "건 — 앞의 3건:", cat.listings.slice(0, 3));
   }).catch((e) => { console.error("실패:", e.message, e.cause ? "(" + e.cause.message + ")" : ""); process.exit(1); });
   return;

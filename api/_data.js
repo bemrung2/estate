@@ -7,13 +7,13 @@
  *   a file     ESTATE_FILE_DB=<path>. For running on your own machine with
  *              `node dev.js` — no account needed.
  *
- * Prices are whole 만원 everywhere. A slot is the half-day a snapshot belongs
- * to, in Korean time: "2026-11-11T00" or "2026-11-11T12".
+ * Prices are whole 만원 everywhere. A slot is the day a snapshot belongs to,
+ * in Korean time: "2026-11-11".
  */
 const fs = require("fs");
 const lib = require("./_core.js");
 
-const SUMMARY = "watch_id,slot,taken_at,count,min_price,med_price,max_price";
+const SUMMARY = "watch_id,slot,taken_at,count,min_price,med_price,max_price,sources";
 
 function supabase(cfg) {
   const db = lib.db(cfg);
@@ -22,6 +22,7 @@ function supabase(cfg) {
     kind: "supabase",
     watches: () => db.select("estate_watches", "select=*&order=ord.asc,created_at.asc"),
     putWatch: (row) => db.upsert("estate_watches", [row]),
+    patchWatch: (id, fields) => db.update("estate_watches", "id=" + eq(id), fields),
     removeWatch: (id) => db.remove("estate_watches", "id=" + eq(id)),
     /* every watch's recent numbers, newest first — the list screen's sparkline */
     summaries: (limit) => db.select("estate_snapshots",
@@ -45,7 +46,7 @@ function file(path) {
   function write(all) { fs.writeFileSync(path, JSON.stringify(all)); }
   const brief = (s) => ({
     watch_id: s.watch_id, slot: s.slot, taken_at: s.taken_at, count: s.count,
-    min_price: s.min_price, med_price: s.med_price, max_price: s.max_price
+    min_price: s.min_price, med_price: s.med_price, max_price: s.max_price, sources: s.sources
   });
   const newest = (a, b) => (a.slot < b.slot ? 1 : a.slot > b.slot ? -1 : 0);
   return {
@@ -56,6 +57,11 @@ function file(path) {
     async putWatch(row) {
       const all = read();
       all.watches = all.watches.filter((w) => w.id !== row.id).concat([row]);
+      write(all);
+    },
+    async patchWatch(id, fields) {
+      const all = read();
+      all.watches = all.watches.map((w) => (w.id === id ? { ...w, ...fields } : w));
       write(all);
     },
     async removeWatch(id) {

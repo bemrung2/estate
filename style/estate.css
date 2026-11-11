@@ -5,11 +5,14 @@
 :root{
   --up: #C4352B;
   --down: #1F5FD6;
+  /* 그림의 두 색: 호가와 실거래. 색각이 달라도 갈리는지 검증한 값이다 */
+  --chart-ask: #1F5FD6;
+  --chart-deal: #9A6224;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){ --up: #FF8F84; --down: #6AAEFF; }
+  :root:not([data-theme="light"]){ --up: #FF8F84; --down: #6AAEFF; --chart-ask: #4C8FF0; --chart-deal: #C17F3C; }
 }
-:root[data-theme="dark"]{ --up: #FF8F84; --down: #6AAEFF; }
+:root[data-theme="dark"]{ --up: #FF8F84; --down: #6AAEFF; --chart-ask: #4C8FF0; --chart-deal: #C17F3C; }
 
 /* ---------- the list ---------- */
 .page-head{ display: flex; align-items: center; gap: 4px; margin: 0 0 22px; }
@@ -118,12 +121,16 @@
 
 /* ---------- the chart ---------- */
 .chart-card{ margin-top: 16px; }
-.chart-wrap{ position: relative; margin-top: 8px; touch-action: pan-y; }
+.chart-wrap{ position: relative; margin-top: 8px; touch-action: pan-y; cursor: crosshair; }
 .chart{ display: block; width: 100%; overflow: visible; }
 .chart .grid{ stroke: var(--line); stroke-width: 1; }
 .chart .tick{ font-size: 10.5px; fill: var(--ink-faint); font-variant-numeric: tabular-nums; font-family: var(--sans); }
-.chart .line{ fill: none; stroke: var(--signal); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.chart .dot{ fill: var(--signal); stroke: var(--surface); stroke-width: 2; }
+.chart .band{ fill: var(--chart-ask); opacity: 0.13; }
+.chart .range{ stroke: var(--chart-ask); stroke-width: 6; stroke-linecap: round; opacity: 0.25; }
+.chart .line{ fill: none; stroke: var(--chart-ask); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chart .line.med{ stroke: var(--ink-faint); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.chart .dot{ fill: var(--chart-ask); stroke: var(--surface); stroke-width: 2; }
+.chart .deal{ fill: var(--chart-deal); stroke: var(--surface); stroke-width: 2; }
 .chart .cross{ stroke: var(--line-strong); stroke-width: 1; }
 .chart-tip{
   position: absolute; top: 0; pointer-events: none;
@@ -132,7 +139,15 @@
   padding: 6px 10px; white-space: nowrap; z-index: 2;
   font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
 }
+.chart-tip span{ display: block; }
 .chart-tip b{ display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.legend{ display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 11.5px; color: var(--ink-soft); }
+.legend span{ display: inline-flex; align-items: center; gap: 6px; }
+.lg{ display: inline-block; flex-shrink: 0; }
+.lg.band{ width: 14px; height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--chart-ask) 22%, transparent); }
+.lg.min{ width: 14px; height: 2px; border-radius: 1px; background: var(--chart-ask); }
+.lg.med{ width: 14px; height: 0; border-top: 2px dotted var(--ink-faint); }
+.lg.deal{ width: 9px; height: 9px; border-radius: 50%; background: var(--chart-deal); }
 
 /* ---------- which snapshot ---------- */
 .slotrow{ padding-top: 14px; scrollbar-width: none; }
@@ -171,3 +186,42 @@
   padding: 11px 8px 11px 14px; margin-bottom: 16px;
 }
 .pick .pick-n{ margin-left: 5px; font-weight: 500; opacity: 0.7; font-variant-numeric: tabular-nums; }
+
+/* ---------- 실거래 · 다른 사이트 ---------- */
+.watch-deal{ display: block; margin-top: 3px; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.watch-deal b{ font-weight: 700; color: var(--ink); }
+.now-deal{
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+}
+.now-deal .lbl{ font-size: 11px; font-weight: 600; color: var(--chart-deal); }
+.now-deal b{ font-size: 14.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.now-deal .gap{ margin-left: auto; font-size: 11.5px; }
+/* 밖으로 나가는 작은 단추 */
+.outlink{
+  display: inline-flex; align-items: center; gap: 3px;
+  font: inherit; font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer;
+  padding: 3px 7px 3px 8px; border-radius: 8px; border: 1px solid var(--line-strong);
+  background: transparent; color: var(--ink-soft);
+}
+.outlink .icon{ width: 11px; height: 11px; }
+.outlink:hover{ color: var(--signal); border-color: var(--signal); }
+.outlink:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; }
+a.ask{ color: inherit; text-decoration: none; }
+a.ask:hover .ask-body b{ color: var(--signal); }
+a.ask:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 6px; }
+.ask-body b{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.badge.src{ font-size: 10px; font-weight: 700; padding: 2px 6px; background: color-mix(in srgb, currentColor 14%, transparent); }
+.badge.src.zigbang{ color: var(--c-food); }
+.badge.src.naver{ color: var(--c-sight); }
+.src-note{ margin: 10px 0 0; font-size: 11.5px; color: var(--ink-faint); word-break: keep-all; }
+.deal-row{ display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.card-head + .deal-row{ border-top: none; }
+.deal-row b{ flex: 0 0 auto; min-width: 86px; font-size: 14.5px; font-weight: 700; letter-spacing: -0.02em; }
+.deal-row span{ font-size: 12.5px; color: var(--ink-soft); }
+.deal-row .when{ margin-left: auto; }
+.deal-row.off b, .deal-row.off span{ text-decoration: line-through; color: var(--ink-faint); }
+.card.t-deal{ --accent: var(--chart-deal); }
+.hero-sub.links{ margin-top: 7px; }
+.fld-hint a{ color: var(--signal); font-weight: 600; }

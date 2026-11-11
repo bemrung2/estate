@@ -56,6 +56,9 @@ function db(cfg) {
           body: JSON.stringify(rows)
         })
       : Promise.resolve(null),
+    update: (table, query, fields) => call(table + "?" + query, {
+      method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify(fields)
+    }),
     remove: (table, query) => call(table + "?" + query, { method: "DELETE", headers: { prefer: "return=minimal" } })
   };
 }

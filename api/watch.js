@@ -1,22 +1,38 @@
 /*
  * The watch list and what was recorded for it.
  *
- *   GET  /api/watch                 -> { ok, sources, watches, series }
+ *   GET  /api/watch                 -> { ok, deals, watches, series }
  *                                      series: { watchId: [summary…] } oldest first
- *   GET  /api/watch?id=W            -> { ok, watch, history }            every snapshot's numbers
- *   GET  /api/watch?id=W&slot=S     -> { ok, snapshot, previous }        the 호가 list of one, and
- *                                                                        of the one before it
- *   POST /api/watch { add: { source, complexId, complexName, address, trade, types:[{id,label}] } }
+ *                                      deals: whether 실거래가 is switched on
+ *   GET  /api/watch?id=W            -> { ok, watch, history }            every day's numbers, and
+ *                                                                        the watch with its 실거래
+ *   GET  /api/watch?id=W&slot=S     -> { ok, snapshot, previous }        the 호가 list of one day,
+ *                                                                        and of the one before it
+ *   POST /api/watch { add: { complexId, complexName, address, trade, naver,
+ *                            types:[{ id, label, supply, exclusive }] } }
+ *   POST /api/watch { link: { complexId, naver } }    네이버 단지를 잇거나("" 이면) 끊는다
  *   POST /api/watch { remove: id }
  */
 const lib = require("./_core.js");
 const { open } = require("./_data.js");
-const { run, SOURCES } = require("../collect/run.js");
+const { run } = require("../collect/run.js");
+const zigbang = require("../collect/zigbang.js");
+const naver = require("../collect/naver.js");
+const molit = require("../collect/molit.js");
 
-const PER_WATCH = 28;      /* two weeks of half-days on the list screen */
+const PER_WATCH = 30;      /* a month of days on the list screen */
 const MAX_WATCHES = 40;
+const SLOT = /^\d{4}-\d{2}-\d{2}(T(00|12))?$/;   /* 예전 기록은 하루 두 번이었다 */
 
 function clean(s, max) { return String(s == null ? "" : s).trim().slice(0, max); }
+const area = (v) => { const n = Number(v); return n > 0 && n < 1000 ? Math.round(n * 100) / 100 : null; };
+
+/* 목록에는 실거래 전부가 아니라 가장 최근 한 건만 실어 보낸다 */
+function brief(w) {
+  const { deals, ...rest } = w;
+  const last = (deals || []).filter((d) => !d.canceled)[0] || null;
+  return { ...rest, last_deal: last };
+}
 
 module.exports = async function handler(req, res) {
   const home = open();
@@ -35,11 +51,7 @@ module.exports = async function handler(req, res) {
           const list = (series[s.watch_id] = series[s.watch_id] || []);
           if (list.length < PER_WATCH) list.unshift(s);
         });
-        return lib.json(res, 200, {
-          ok: true,
-          sources: Object.keys(SOURCES).map((k) => ({ key: k, name: SOURCES[k].name, ask: SOURCES[k].ask })),
-          watches: watches || [], series
-        });
+        return lib.json(res, 200, { ok: true, deals: molit.enabled(), watches: (watches || []).map(brief), series });
       }
 
       const slot = url.searchParams.get("slot");
@@ -50,7 +62,7 @@ module.exports = async function handler(req, res) {
         return lib.json(res, 200, { ok: true, watch, history: (history || []).reverse() });
       }
 
-      if (!/^\d{4}-\d{2}-\d{2}T(00|12)$/.test(slot)) return lib.json(res, 400, { ok: false, error: "slot" });
+      if (!SLOT.test(slot)) return lib.json(res, 400, { ok: false, error: "slot" });
       const history = (await data.history(id)) || [];
       const at = history.findIndex((s) => s.slot === slot);
       if (at < 0) return lib.json(res, 404, { ok: false, error: "unknown" });
@@ -70,42 +82,70 @@ module.exports = async function handler(req, res) {
         return lib.json(res, 200, { ok: true });
       }
 
-      const add = body && body.add;
-      if (!add) return lib.json(res, 400, { ok: false, error: "empty" });
-      const source = SOURCES[add.source];
-      const complexId = clean(add.complexId, 12);
-      const types = Array.isArray(add.types) ? add.types.slice(0, 12) : [];
-      if (!source || !/^\d+$/.test(complexId) || !source.TRADES[add.trade] || !types.length ||
-          !clean(add.complexName, 60)) {
-        return lib.json(res, 400, { ok: false, error: "body" });
+      const existing = (await data.watches()) || [];
+
+      if (body && body.link) {
+        const complexId = clean(body.link.complexId, 12);
+        const given = clean(body.link.naver, 200);
+        const naverId = naver.complexNo(given);
+        if (given && !naverId) {
+          return lib.json(res, 400, { ok: false, error: "naver", message: "네이버 부동산 단지 주소나 번호를 확인해 주세요." });
+        }
+        const mine = existing.filter((w) => w.complex_id === complexId);
+        if (!mine.length) return lib.json(res, 404, { ok: false, error: "unknown" });
+        for (const w of mine) await data.patchWatch(w.id, { naver_id: naverId });
+        let first = null;
+        if (naverId) {
+          try { first = await run(data, { only: mine.map((w) => w.id) }); }
+          catch (e) { first = { failed: [{ error: String(e.message || e).slice(0, 200) }] }; }
+        }
+        return lib.json(res, 200, { ok: true, naverId, first });
       }
 
-      const existing = (await data.watches()) || [];
+      const add = body && body.add;
+      if (!add) return lib.json(res, 400, { ok: false, error: "empty" });
+      const complexId = clean(add.complexId, 12);
+      const types = Array.isArray(add.types) ? add.types.slice(0, 12) : [];
+      if (!/^\d+$/.test(complexId) || !zigbang.TRADES[add.trade] || !types.length || !clean(add.complexName, 60)) {
+        return lib.json(res, 400, { ok: false, error: "body" });
+      }
       if (existing.length + types.length > MAX_WATCHES) {
         return lib.json(res, 400, { ok: false, error: "full", message: "관심 평형은 " + MAX_WATCHES + "개까지 등록할 수 있습니다." });
       }
+
+      /* 같은 단지를 이미 보고 있으면 그 단지의 네이버 번호와 주소를 물려받는다 */
+      const sibling = existing.find((w) => w.complex_id === complexId);
+      const naverId = naver.complexNo(clean(add.naver, 200)) || (sibling && sibling.naver_id) || "";
+      let where = sibling ? { lawd_cd: sibling.lawd_cd, dong_name: sibling.dong_name, jibun: sibling.jibun } : null;
+      if (!where || !where.lawd_cd) {
+        try { where = await zigbang.place(complexId); }
+        catch (e) { where = { lawd_cd: "", dong_name: "", jibun: "" }; }
+      }
+
       let ord = existing.reduce((m, w) => Math.max(m, Number(w.ord) || 0), 0);
       const added = [];
       for (const t of types) {
-        const typeId = clean(t && t.id, 24);
-        if (!/^[\w.]+$/.test(typeId)) return lib.json(res, 400, { ok: false, error: "body" });
-        const id = [source.key, complexId, typeId, add.trade].join("-");
+        const typeId = clean(t && t.id, 12);
+        if (!/^\d+$/.test(typeId)) return lib.json(res, 400, { ok: false, error: "body" });
+        const id = ["zigbang", complexId, typeId, add.trade].join("-");
         if (existing.some((w) => w.id === id)) continue;       /* 이미 보고 있는 평형 */
         await data.putWatch({
-          id, source: source.key, complex_id: complexId,
+          id, source: "zigbang", complex_id: complexId,
           complex_name: clean(add.complexName, 60), address: clean(add.address, 80),
           room_type_id: typeId, room_label: clean(t.label, 30), trade: add.trade,
-          ord: ++ord, created_at: new Date().toISOString()
+          naver_id: naverId, supply_m2: area(t.supply), exclusive_m2: area(t.exclusive),
+          lawd_cd: clean(where.lawd_cd, 5), dong_name: clean(where.dong_name, 30), jibun: clean(where.jibun, 20),
+          deals: [], ord: ++ord, created_at: new Date().toISOString()
         });
         added.push(id);
       }
 
       /* 등록하자마자 첫 숫자가 보이도록 지금 한 번 받아 둔다. 실패해도 등록은 된 것이다 —
-         다음 정각에 다시 받는다. */
+         다음 수집 때 다시 받는다. */
       let first = null;
       if (added.length) {
-        try { first = await run(data, { only: added, onlyMissing: true }); }
-        catch (e) { first = { failed: [{ error: String(e.message || e).slice(0, 200) }] }; }
+        try { first = await run(data, { only: added }); }
+        catch (e) { first = { saved: 0, failed: [{ error: String(e.message || e).slice(0, 200) }] }; }
       }
       return lib.json(res, 200, { ok: true, added, first });
     }
