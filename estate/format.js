@@ -44,8 +44,12 @@ export function floorLabel(f){
 export var PLATFORM = { zigbang: "직방", naver: "네이버" };
 
 /* 매물 하나의 원래 화면 */
-export function listingUrl(l){
-  if (l.src === "naver") return "https://fin.land.naver.com/articles/" + encodeURIComponent(l.item || l.id);
+export function listingUrl(l, w){
+  if (l.src === "naver"){
+    /* 여러 중개사가 묶어 올린 매물은 번호가 없다 — 그때는 단지의 매물 탭으로 */
+    if (l.item) return "https://fin.land.naver.com/articles/" + encodeURIComponent(l.item);
+    return w && w.naver_id ? naverComplexUrl(w.naver_id) : "";
+  }
   if (l.item) return "https://www.zigbang.com/home/apt/items/" + encodeURIComponent(l.item);
   return "";
 }

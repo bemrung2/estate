@@ -1,45 +1,14 @@
 /*
- * 네이버 부동산 — 단지 번호로 그 단지의 매물을 받고, 면적으로 평형을 맞춘다.
+ * 네이버 부동산 — 서버는 네이버를 부르지 않는다.
  *
- * !! 이 파일은 실제 응답으로 확인하지 못한 채 쓰였다. 만든 환경(클라우드 서버)에서는
- * 네이버가 연결을 받자마자 끊어서 한 번도 답을 받지 못했다. 주소와 필드 이름은 널리
- * 알려진 모바일 웹(m.land.naver.com)의 것을 따랐으니, 집 컴퓨터에서
+ * 네이버는 공개 API가 없고 클라우드 서버의 연결을 받지 않는다. 그래서 매물은 사람이 제
+ * 브라우저로 네이버 부동산의 단지 매물 탭을 열어 둔 채, 화면에 떠 있는 목록을 읽어
+ * 넘겨준다 (북마크 단추 — estate/naver.js). 여기는 넘겨받은 것을 다듬고, 어느 관심 평형의
+ * 것인지 가리는 일만 한다.
  *
- *     node dev.js probe naver <단지 번호>
- *
- * 로 먼저 확인하고, 모양이 다르면 여기 한 파일만 고치면 된다.
- *
- * 요청은 꾸밈없이 보낸다. 브라우저인 척하거나 차단을 피해 가는 장치는 두지 않는다 —
- * 네이버가 받아주는 곳에서만 돌고, 막는 곳에서는 실패로 기록된다.
+ * 화면의 면적은 "81㎡ (전용60)"처럼 공급이 정수로 깎여 있다. 그래서 전용 면적을 먼저 보고
+ * 공급은 느슨하게 본다.
  */
-const BASE = "https://m.land.naver.com";
-const CODE = { trade: "A1", charter: "B1" };
-const MAX_PAGES = 40;
-/* 같은 평형으로 볼 면적 차이(㎡). 110.44와 110.17처럼 타입만 다른 평형은 갈라야 한다 */
-const NEAR = 0.15;
-
-const pause = (ms) => new Promise((done) => setTimeout(done, ms));
-
-async function request(path, init) {
-  try { return await fetch(BASE + path, { signal: AbortSignal.timeout(8000), ...init }); }
-  catch (e) { throw new Error("네이버 부동산이 이 서버의 연결을 받지 않습니다"); }
-}
-
-async function get(path) {
-  const res = await request(path, { headers: { accept: "application/json" } });
-  if (!res.ok) throw new Error("naver " + res.status + " " + path.split("?")[0]);
-  const text = await res.text();
-  try { return JSON.parse(text); }
-  catch (e) { throw new Error("naver: JSON이 아닌 답 (" + text.slice(0, 60).replace(/\s+/g, " ") + ")"); }
-}
-
-/* "24억 9,000" → 249000 · "9억" → 90000 · "8,500" → 8500 (만원) */
-function price(text) {
-  const s = String(text == null ? "" : text).replace(/[,\s]/g, "");
-  const m = s.match(/^(?:(\d+)억)?(\d+)?/);
-  if (!m || (!m[1] && !m[2])) return 0;
-  return (Number(m[1]) || 0) * 10000 + (Number(m[2]) || 0);
-}
 
 /* 주소든 번호든, 그 안의 단지 번호 */
 function complexNo(text) {
@@ -48,88 +17,53 @@ function complexNo(text) {
   return m ? m[1] : "";
 }
 
-/* 이름으로 단지 번호 찾기. 모바일 웹의 검색은 딱 맞는 단지가 있으면 그 단지 화면으로
-   보낸다 — 그 주소에서 번호를 읽는다. 못 찾으면 빈 문자열. */
-async function find(name) {
-  const res = await request("/search/result/" + encodeURIComponent(name), { redirect: "manual" });
-  return complexNo(res.headers.get("location") || "");
+const text = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
+const num = (v, max) => { const n = Number(v); return n > 0 && n < max ? n : 0; };
+
+/* 넘겨받은 한 줄을 믿을 수 있는 모양으로. 쓸 수 없으면 null */
+function clean(l) {
+  if (!l || (l.trade !== "trade" && l.trade !== "charter")) return null;
+  const price = Math.round(num(l.price, 1e8));
+  const id = text(l.id, 60);
+  if (!price || !id) return null;
+  const max = Math.round(num(l.max, 1e8));
+  return {
+    src: "naver", id, item: /^\d{1,14}$/.test(String(l.item || "")) ? String(l.item) : "",
+    trade: l.trade, price, max: max > price ? max : 0,
+    supply: num(l.supply, 2000), exclusive: num(l.exclusive, 2000),
+    dong: text(l.dong, 20), floor: text(l.floor, 8), title: text(l.title, 120),
+    n: Math.max(1, Math.min(99, Math.round(Number(l.n) || 1)))
+  };
 }
 
-/* 매물 목록 한 쪽의 주소. cortarNo는 그 단지의 법정동 코드(10자리) — 이것 없이 부르면
-   네이버는 "null"만 돌려준다 (실제로 그렇게 돌아왔다). */
-function pageUrl(complexId, trade, n, cortarNo) {
-  return BASE + "/complex/getComplexArticleList?hscpNo=" + encodeURIComponent(complexId) +
-    (cortarNo ? "&cortarNo=" + encodeURIComponent(cortarNo) : "") +
-    "&tradTpCd=" + CODE[trade] + "&order=prc&showR0=N&page=" + n;
-}
-
-/* 그 주소가 어느 단지 · 거래 · 몇 쪽이었는지 (남이 대신 받아다 준 것을 읽을 때) */
-function readUrl(url) {
-  const m = String(url || "").match(/hscpNo=(\d{1,12}).*?tradTpCd=(A1|B1).*?page=(\d{1,3})/);
-  if (!m) return null;
-  return { complexId: m[1], trade: m[2] === "A1" ? "trade" : "charter", page: Number(m[3]) };
-}
-
-/* 받은 한 쪽 → { name, listings, more }. 매물마다 공급(supply) · 전용(exclusive) 면적이 붙는다. */
-function parsePage(data) {
-  if (typeof data === "string") {
-    try { data = JSON.parse(data); }
-    catch (e) { throw new Error("naver: JSON이 아닌 답 (" + data.slice(0, 60).replace(/\s+/g, " ") + ")"); }
+/* 이 매물이 그 평형과 얼마나 먼가 (전용 면적의 차). 같은 평형일 수 없으면 Infinity */
+function distance(l, w) {
+  const own = Number(w.exclusive_m2), supply = Number(w.supply_m2);
+  if (l.trade !== w.trade) return Infinity;
+  if (own && l.exclusive) {
+    const d = Math.abs(l.exclusive - own);
+    if (d > 0.6) return Infinity;
+    if (supply && l.supply && Math.abs(l.supply - supply) > 1.5) return Infinity;
+    return d;
   }
-  if (data === null) throw new Error("naver: 빈 답(null) — 주소의 조건이 맞지 않습니다");
-  if (!data || !data.result) throw new Error("naver: 뜻밖의 답");
-  const result = data.result;
-  const list = Array.isArray(result.list) ? result.list : [];
-  const listings = [];
-  list.forEach((it) => {
-    const id = String(it.atclNo || "");
-    if (!id) return;
-    listings.push({
-      src: "naver",
-      id,
-      item: id,
-      supply: parseFloat(it.spc1) || 0,
-      exclusive: parseFloat(it.spc2) || 0,
-      price: price(it.prcInfo),
-      dong: it.bildNm || "",
-      floor: String(it.flrInfo || "").split("/")[0],
-      title: it.atclFetrDesc || "",
-      n: Number(it.sameAddrCnt) || 1
+  if (supply && l.supply) return Math.abs(l.supply - supply) <= 1 ? 0.5 : Infinity;
+  return Infinity;
+}
+
+/* 매물마다 가장 가까운 평형 하나로 보낸다 → { watchId: [listing…] }, 어디에도 안 맞은 수 */
+function assign(listings, watches) {
+  const out = {};
+  watches.forEach((w) => { out[w.id] = []; });
+  let unmatched = 0;
+  listings.forEach((l) => {
+    let best = null, far = Infinity;
+    watches.forEach((w) => {
+      const d = distance(l, w);
+      if (d < far) { far = d; best = w; }
     });
+    if (best) out[best.id].push(l); else unmatched++;
   });
-  return { name: (list[0] && list[0].atclNm) || "", listings, more: result.moreDataYn === "Y" && list.length > 0 };
+  return { byWatch: out, unmatched };
 }
 
-/* 한 단지의 한 거래 유형 전부 */
-async function catalog(complexId, trade) {
-  if (!CODE[trade]) throw new Error("unknown trade " + trade);
-  const listings = [];
-  const seen = {};
-  let name = "";
-  for (let n = 1; n <= MAX_PAGES; n++) {
-    if (n > 1) await pause(350);
-    const got = parsePage(await get(pageUrl(complexId, trade, n).slice(BASE.length)));
-    name = name || got.name;
-    got.listings.forEach((l) => { if (!seen[l.id]) { seen[l.id] = true; listings.push(l); } });
-    if (!got.more) break;
-  }
-  return { name, listings };
-}
-
-/* 첫 매물 하나를 받은 그대로 — 이름들이 맞는지 볼 때 (api/probe.js) */
-async function raw(complexId) {
-  const data = await get("/complex/getComplexArticleList?hscpNo=" + encodeURIComponent(complexId) +
-    "&tradTpCd=A1&order=prc&showR0=N&page=1");
-  const list = (data && data.result && data.result.list) || null;
-  return list ? list[0] || "(매물 없음)" : data;
-}
-
-/* 이 매물이 그 관심 평형의 것인가 — 공급 면적으로, 전용 면적을 알면 그것으로도 */
-function sameType(listing, watch) {
-  const supply = Number(watch.supply_m2), own = Number(watch.exclusive_m2);
-  if (!supply) return false;
-  if (Math.abs(listing.supply - supply) > (own ? NEAR : 0.6)) return false;
-  return !own || !listing.exclusive || Math.abs(listing.exclusive - own) <= NEAR;
-}
-
-module.exports = { key: "naver", name: "네이버 부동산", catalog, find, raw, pageUrl, readUrl, parsePage, sameType, price, complexNo };
+module.exports = { key: "naver", name: "네이버 부동산", complexNo, clean, assign };

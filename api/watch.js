@@ -12,11 +12,12 @@
  *   POST /api/watch { add: { complexId, complexName, address, trade, naver,
  *                            types:[{ id, label, supply, exclusive }] } }
  *   POST /api/watch { link: { complexId, naver } }    네이버 단지를 잇거나("" 이면) 끊는다
+ *   POST /api/watch { importNaver: { complex, listings:[…] } }   네이버 매물 탭에서 읽어 온 목록
  *   POST /api/watch { remove: id }
  */
 const lib = require("./_core.js");
 const { open } = require("./_data.js");
-const { run, peek, ensure, refreshDeals } = require("../collect/run.js");
+const { run, peek, ensure, refreshDeals, importNaver } = require("../collect/run.js");
 const zigbang = require("../collect/zigbang.js");
 const naver = require("../collect/naver.js");
 const molit = require("../collect/molit.js");
@@ -106,11 +107,25 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const body = await lib.readBody(req, 16384);
+      const body = await lib.readBody(req, 400000);
 
       if (body && body.remove) {
         await data.removeWatch(clean(body.remove, 80));
         return lib.json(res, 200, { ok: true });
+      }
+
+      if (body && body.importNaver) {
+        const complex = naver.complexNo(clean(body.importNaver.complex, 12));
+        const sent = Array.isArray(body.importNaver.listings) ? body.importNaver.listings.slice(0, 800) : null;
+        if (!complex || !sent) return lib.json(res, 400, { ok: false, error: "body" });
+        const done = await importNaver(data, complex, sent);
+        if (!done) {
+          return lib.json(res, 404, {
+            ok: false, error: "unknown",
+            message: "이 네이버 단지(" + complex + ")에 연결된 관심 단지가 없습니다. 단지 화면에서 네이버 연결을 확인해 주세요."
+          });
+        }
+        return lib.json(res, 200, { ok: true, ...done });
       }
 
       const existing = (await data.watches()) || [];

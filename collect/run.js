@@ -14,6 +14,8 @@ const molit = require("./molit.js");
 const hogangnono = require("./hogangnono.js");
 const kb = require("./kb.js");
 
+/* 서버가 직접 받는 곳은 직방뿐이다. 네이버 매물은 사람이 넘겨준다(importNaver) — 수집 때는
+   오늘 넘겨받아 둔 것을 그대로 둔다. */
 const PLATFORMS = { zigbang, naver };
 const KST = 9 * 3600 * 1000;
 
@@ -53,18 +55,6 @@ async function fetchGroup(group) {
     state.zigbang = "fail";
     failed.push({ complex: head.complex_name, source: "직방", error: why(e) });
   }
-  /* 네이버는 서버에서 직접 받지 않는다: 클라우드 서버의 연결을 받지 않고, 예전 목록 주소는
-     이제 null만 준다. NAVER_DIRECT=1 일 때만 시도한다 (받아주는 곳에서 시험할 때). */
-  const naverId = process.env.NAVER_DIRECT === "1" ? (group.find((w) => w.naver_id) || {}).naver_id : "";
-  if (naverId) {
-    try {
-      got.naver = (await naver.catalog(naverId, head.trade)).listings;
-      state.naver = "ok";
-    } catch (e) {
-      state.naver = "fail";
-      failed.push({ complex: head.complex_name, source: "네이버 부동산", error: why(e) });
-    }
-  }
   return { got, state, failed };
 }
 
@@ -75,9 +65,7 @@ function listingsFor(w, fetched, before) {
   let listings = [];
   Object.keys(PLATFORMS).forEach((src) => {
     if (fetched.got[src]) {
-      const mine = src === "zigbang"
-        ? fetched.got[src].filter((l) => l.type === w.room_type_id)
-        : fetched.got[src].filter((l) => naver.sameType(l, w));
+      const mine = fetched.got[src].filter((l) => l.type === w.room_type_id);
       listings = listings.concat(mine.map(keep));
       sources[src] = "ok";
     } else {
@@ -208,32 +196,29 @@ async function run(data, opts) {
 }
 
 /*
- * 네이버 매물 한 쪽을 남이 대신 받아다 줬을 때 (api/relay.js) 오늘 기록에 끼워 넣는다.
- * 1쪽이 오면 그 단지 · 거래의 오늘 네이버 매물을 새로 시작하고, 다음 쪽은 거기에 보탠다.
- * → 몇 개의 관심에 몇 건이 들어갔는지
+ * 네이버 부동산의 단지 매물 탭에서 읽어 넘겨준 목록을 오늘 기록에 넣는다 (api/watch.js).
+ * 그 단지를 보고 있는 관심 평형마다 오늘의 네이버 매물이 통째로 바뀐다 — 직방 것은 그대로.
+ * → { watches: [{ id, count }], unmatched }
  */
-async function absorbNaver(data, where, page) {
+async function importNaver(data, complexNo, rawListings) {
   const slot = slotOf();
-  const group = ((await data.watches()) || []).filter((w) => w.naver_id === where.complexId && w.trade === where.trade);
-  let kept = 0;
-  for (const w of group) {
+  const watches = ((await data.watches()) || []).filter((w) => w.naver_id === complexNo);
+  if (!watches.length) return null;
+  const listings = (rawListings || []).map(naver.clean).filter(Boolean);
+  const { byWatch, unmatched } = naver.assign(listings, watches);
+  const done = [];
+  for (const w of watches) {
     const before = await data.snapshot(w.id, slot);
-    const old = (before && before.listings) || [];
-    const others = old.filter((l) => (l.src || "zigbang") !== "naver");
-    const mine = where.page > 1 ? old.filter((l) => l.src === "naver") : [];
-    const seen = {};
-    mine.forEach((l) => { seen[l.id] = true; });
-    page.listings.filter((l) => naver.sameType(l, w)).forEach((l) => {
-      if (!seen[l.id]) { seen[l.id] = true; mine.push(keep(l)); }
-    });
-    const listings = others.concat(mine).sort((a, b) => a.price - b.price);
+    const others = ((before && before.listings) || []).filter((l) => (l.src || "zigbang") !== "naver");
+    const mine = byWatch[w.id].map(({ trade, supply, exclusive, ...rest }) => rest);
+    const all = others.concat(mine).sort((a, b) => a.price - b.price);
     await data.putSnapshot({
-      watch_id: w.id, slot, taken_at: new Date().toISOString(), ...stats(listings), listings,
+      watch_id: w.id, slot, taken_at: new Date().toISOString(), ...stats(all), listings: all,
       sources: Object.assign({}, before && before.sources, { naver: "ok" })
     });
-    kept += mine.length;
+    done.push({ id: w.id, count: mine.length });
   }
-  return { watches: group.length, listings: kept };
+  return { watches: done, unmatched };
 }
 
-module.exports = { run, peek, ensure, refreshDeals, absorbNaver, slotOf, stats, PLATFORMS };
+module.exports = { run, peek, ensure, refreshDeals, importNaver, slotOf, stats, PLATFORMS };

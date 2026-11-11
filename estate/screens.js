@@ -7,6 +7,7 @@ import { brandMark, pageFooter } from "../ui/shell.js";
 import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag, openTextDialog } from "../ui/sheet.js";
 import { won, delta, slotLabel, slotShort, dayShort, clock, floorLabel, PLATFORM,
          listingUrl, hogangnonoUrl, naverComplexUrl, naverSearchUrl } from "./format.js";
+import { bookmarklet, unpack } from "./naver.js";
 import { sparkline, flowChart, flowLegend, dealChart } from "./chart.js";
 
 var nav = { go: function(){}, set: function(){}, reload: function(){} };
@@ -231,11 +232,10 @@ export function renderWatch(view, id, slot){
     '<div class="hero-sub links">' + outlink("호갱노노", hogangnonoUrl(w)) +
       (w.naver_id ? outlink("네이버 부동산", naverComplexUrl(w.naver_id)) : '') + '</div></div>');
   ripple(hero.querySelector(".hero-back"), function(){ nav.go("/"); });
-  if (!w.naver_id){
-    var link = el('<button class="outlink" type="button">네이버 연결' + icon("plus") + '</button>');
-    ripple(link, function(){ openNaverLink(w); });
-    hero.querySelector(".links").appendChild(link);
-  }
+  var link = el('<button class="outlink" type="button">' + (w.naver_id ? "네이버 매물 가져오기" : "네이버 연결") +
+    icon("plus") + '</button>');
+  ripple(link, function(){ if (w.naver_id) openNaverImport(w); else openNaverLink(w); });
+  hero.querySelector(".links").appendChild(link);
   page.appendChild(hero);
   var body = el('<div><div class="card"><span class="bar bar-s"></span><span class="bar bar-m"></span>' +
     '<span class="bar bar-l"></span></div></div>');
@@ -367,13 +367,20 @@ function paintWatch(body, hero, w, history, at, mine, live){
         else if (o.price !== l.price) mark = '<span class="chg ' + (l.price > o.price ? "up" : "down") + '">' +
           delta(l.price - o.price) + '</span>';
       }
-      list.appendChild(askRow(l, mark));
+      list.appendChild(askRow(l, mark, false, w));
     });
 
     var sources = (data.snapshot && data.snapshot.sources) || {};
     var failed = Object.keys(sources).filter(function(k){ return sources[k] === "fail"; });
     if (failed.length) list.appendChild(el('<p class="src-note">' +
       failed.map(function(k){ return PLATFORM[k] || k; }).join(" · ") + ' 매물은 ' + (now ? "지금" : "이날") + ' 받지 못했습니다.</p>'));
+
+    if (w.naver_id && sources.naver !== "ok"){
+      var note = el('<p class="src-note">네이버 매물은 ' + (now ? "가져오기로만 기록됩니다" : "이날 가져오지 않았습니다") +
+        ' · <button class="inline-link" type="button">가져오는 방법</button></p>');
+      note.querySelector("button").addEventListener("click", function(){ openNaverImport(w); });
+      list.appendChild(note);
+    }
 
     var gone = (was || []).filter(function(l){ return !nowBy[key(l)] && nowSrc[l.src || "zigbang"]; });
     if (gone.length){
@@ -391,10 +398,10 @@ function paintWatch(body, hero, w, history, at, mine, live){
 
 /* 매물 한 줄. 누르면 그 매물을 올린 곳의 화면이 새 창으로 열린다 —
    빠진 매물은 갈 곳이 없으니 줄만 남는다. */
-function askRow(l, mark, dead){
+function askRow(l, mark, dead, w){
   var src = l.src || "zigbang";
   var where = [l.dong, floorLabel(l.floor)].filter(Boolean).join(" · ");
-  var url = dead ? "" : listingUrl(l);
+  var url = dead ? "" : listingUrl(l, w);
   var inner = '<span class="ask-price">' + won(l.price) + '</span>' +
     '<span class="ask-body"><b>' + esc(where || "동 · 층 미상") +
       '<span class="badge src ' + src + '">' + esc(PLATFORM[src] || src) + '</span></b>' +
@@ -535,10 +542,8 @@ function openNaverLink(w){
   }, function(value){
     Store.post({ link: { complexId: w.complex_id, naver: value } }).then(function(data){
       if (!data) return;
-      var bad = data.first && (data.first.failed || []).filter(function(f){ return /네이버/.test(f.source || ""); })[0];
       var was = w.naver_id || "";
-      if (bad) toast("연결했습니다. 다만 지금은 네이버 매물을 받지 못했습니다 — " + bad.error, true);
-      else if (was === data.naverId) toastDone("네이버 부동산을 연결했습니다.");
+      if (was === data.naverId) toastDone("네이버 부동산을 연결했습니다.");
       else toastUndo("네이버 연결을 수정했습니다.", function(){
         Store.post({ link: { complexId: w.complex_id, naver: was } }).then(function(){
           toastDone("되돌렸습니다."); nav.reload();
@@ -547,6 +552,61 @@ function openNaverLink(w){
       nav.reload();
     }).catch(function(e){ toast("연결하지 못했습니다 — " + e.message, true); });
     return null;
+  });
+}
+
+/* 네이버 매물을 가져오는 법. 서버는 네이버에 닿지 못해서, 내 브라우저에 떠 있는 매물 탭을
+   북마크 단추로 읽어 온다 (estate/naver.js). */
+function openNaverImport(w){
+  var sheet = sheetShell("네이버 매물 가져오기", w.complex_name);
+  var code = bookmarklet(location.origin + location.pathname);
+  var body = sheet.querySelector(".sheet-body");
+  body.appendChild(el('<ol class="guide">' +
+    '<li><b>처음 한 번</b> — 아래 단추를 브라우저의 북마크바로 끌어다 놓습니다.' +
+      '<div class="guide-row"><a class="bookmark" href="' + esc(code) + '">' + icon("link") + 'BEMESTATE 가져오기</a>' +
+      '<button class="linkbtn" type="button" data-copy>주소 복사</button></div>' +
+      '<small>휴대폰에서는 아무 화면이나 북마크한 뒤, 그 북마크의 주소를 복사한 것으로 바꿔 넣습니다.</small></li>' +
+    '<li>네이버 부동산에서 이 단지의 <a href="' + esc(naverComplexUrl(w.naver_id)) +
+      '" target="_blank" rel="noopener">매물 탭</a>을 엽니다. 거래 방식 · 면적을 걸러 두었다면 풀어 주세요.</li>' +
+    '<li>그 화면에서 북마크 <b>BEMESTATE 가져오기</b>를 누릅니다. 목록을 끝까지 읽은 뒤 이 화면으로 돌아와 ' +
+      '오늘 기록에 넣습니다.</li></ol>' +
+    '<p class="src-note">같은 단지의 다른 관심 평형도 한 번에 채워집니다. 하루에 여러 번 가져오면 마지막 것이 남습니다.</p>'));
+  body.querySelector(".bookmark").addEventListener("click", function(e){
+    e.preventDefault();
+    toast("누르지 말고, 북마크바로 끌어다 놓아 주세요.");
+  });
+  body.querySelector("[data-copy]").addEventListener("click", function(){
+    navigator.clipboard.writeText(code).then(function(){ toastDone("북마크 주소를 복사했습니다."); })
+      .catch(function(){ toast("복사하지 못했습니다. 단추를 길게 눌러 링크 주소를 복사해 주세요.", true); });
+  });
+  sheet.querySelector(".sheet-foot").hidden = true;
+  showOverlay(sheet);
+}
+
+/* 북마크 단추가 네이버 화면에서 읽어 온 것을 받아 오늘 기록에 넣는다 ("#/import/<단지>/<…>") */
+export function renderImport(view, complex, payload){
+  var got = unpack(payload);
+  var page = el('<div class="tabpad"><div class="card"><div class="card-head"><h3>네이버 매물 가져오기</h3></div>' +
+    '<p class="card-empty">읽어 온 매물을 기록하는 중…</p></div></div>');
+  swap(view, page);
+  if (!got || !got.rows.length){
+    toast("읽어 온 매물이 없습니다. 네이버 매물 탭에서 다시 눌러 주세요.", true);
+    return nav.set("/");
+  }
+  Store.post({ importNaver: { complex: complex, listings: got.listings } }).then(function(data){
+    var n = data.watches.reduce(function(sum, x){ return sum + x.count; }, 0);
+    var each = data.watches.map(function(x){
+      var w = Store.watch(x.id);
+      return (w ? w.room_label + " " + TRADE[w.trade] : x.id) + " " + x.count + "건";
+    }).join(" · ");
+    var short = got.total > got.rows.length ? " (네이버 " + got.total + "건 중 " + got.rows.length + "건만 읽었습니다)" : "";
+    var first = data.watches.filter(function(x){ return x.count; })[0] || data.watches[0];
+    if (n) toastDone("네이버 매물을 기록했습니다 — " + each + short);
+    else toast("관심 평형에 맞는 네이버 매물이 없었습니다 (읽은 매물 " + got.rows.length + "건)" + short, true);
+    Store.load().then(function(){ nav.set("/w/" + encodeURIComponent(first.id)); });
+  }).catch(function(e){
+    toast("네이버 매물을 기록하지 못했습니다 — " + e.message, true);
+    nav.set("/");
   });
 }
 

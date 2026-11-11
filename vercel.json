@@ -14,9 +14,6 @@
     },
     "api/probe.js": {
       "maxDuration": 30
-    },
-    "api/relay.js": {
-      "maxDuration": 30
     }
   },
   "headers": [
