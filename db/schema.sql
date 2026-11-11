@@ -47,6 +47,14 @@ create table if not exists estate_snapshots (
 
 alter table estate_snapshots add column if not exists sources jsonb not null default '{}'::jsonb;
 
+-- 예전에는 하루 두 번(…T00 · …T12) 기록했다. 이제 낮 12시 한 번뿐이다:
+-- 00시 기록은 지우고, 12시 기록은 그날의 기록("2026-11-11")으로 삼는다.
+delete from estate_snapshots where slot like '%T00';
+delete from estate_snapshots a
+ where a.slot like '%T12'
+   and exists (select 1 from estate_snapshots b where b.watch_id = a.watch_id and b.slot = left(a.slot, 10));
+update estate_snapshots set slot = left(slot, 10) where slot like '%T12';
+
 create index if not exists estate_snapshots_slot_idx on estate_snapshots(slot desc);
 
 alter table estate_watches   enable row level security;

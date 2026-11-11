@@ -20,16 +20,19 @@ export function dayShort(iso){
   return Number(iso.slice(5, 7)) + "." + Number(iso.slice(8, 10));
 }
 
-/* 기록 하나의 이름. 예전 기록은 하루 두 번이어서 시각이 붙어 있다:
-   "2026-11-11" → "11.11" · "2026-11-11T00" → "11.11 00시" */
-export function slotShort(slot){
-  return dayShort(slot) + (slot.length > 10 ? " " + slot.slice(11, 13) + "시" : "");
-}
+/* 기록 하나의 이름: "2026-11-11" → "11.11" */
+export function slotShort(slot){ return dayShort(slot); }
 
 /* "2026-11-11" → "11.11 (수)" */
 export function slotLabel(slot){
   var day = new Date(slot.slice(0, 10) + "T00:00:00");
-  return dayShort(slot) + " (" + DOW[day.getDay()] + ")" + (slot.length > 10 ? " " + slot.slice(11, 13) + "시" : "");
+  return dayShort(slot) + " (" + DOW[day.getDay()] + ")";
+}
+
+/* 시각 하나: "14:05" (보는 사람의 시계로) */
+export function clock(iso){
+  var d = new Date(iso);
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 }
 
 /* 층은 숫자로도, 저 · 중 · 고로도 온다 */

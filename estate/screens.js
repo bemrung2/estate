@@ -5,7 +5,7 @@ import { Store } from "../ui/store.js";
 import { themeButton } from "../ui/theme.js";
 import { brandMark, pageFooter } from "../ui/shell.js";
 import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag, openTextDialog } from "../ui/sheet.js";
-import { won, delta, slotLabel, slotShort, dayShort, floorLabel, PLATFORM,
+import { won, delta, slotLabel, slotShort, dayShort, clock, floorLabel, PLATFORM,
          listingUrl, hogangnonoUrl, naverComplexUrl, naverSearchUrl } from "./format.js";
 import { sparkline, flowChart, flowLegend } from "./chart.js";
 
@@ -133,7 +133,17 @@ export function renderWatch(view, id, slot){
     }
     var at = history.length - 1;
     history.forEach(function(s, i){ if (s.slot === slot) at = i; });
-    paintWatch(body, hero, full, history, at, mine);
+    if (slot !== "now") return paintWatch(body, hero, full, history, at, mine, null);
+    /* 현재: 기록을 먼저 그려 두고, 지금 올라와 있는 것을 받아 오면 바꿔 그린다 */
+    paintWatch(body, hero, full, history, at, mine, "wait");
+    return Store.live(id).then(function(live){
+      if (mine !== shown || !live) return;
+      paintWatch(body, hero, full, history, at, mine, live);
+    }).catch(function(e){
+      if (mine !== shown) return;
+      toast("지금 호가를 받아오지 못했습니다 — " + e.message, true);
+      paintWatch(body, hero, full, history, at, mine, null);
+    });
   }).catch(function(e){
     if (mine !== shown) return;
     body.innerHTML = "";
@@ -144,8 +154,10 @@ export function renderWatch(view, id, slot){
 
 function liveDeals(w){ return (w.deals || []).filter(function(d){ return !d.canceled; }); }
 
-function paintWatch(body, hero, w, history, at, mine){
-  var snap = history[at], before = history[at - 1];
+/* live: null(기록을 본다) · "wait"(지금 것을 받는 중) · { snapshot, previous }(지금 것) */
+function paintWatch(body, hero, w, history, at, mine, live){
+  var now = live && live !== "wait" ? live.snapshot : null;
+  var snap = now || history[at], before = now ? history[history.length - 1] : history[at - 1];
   var deal = liveDeals(w)[0];
   var old = hero.querySelector(".now");
   if (old) old.remove();
@@ -155,7 +167,8 @@ function paintWatch(body, hero, w, history, at, mine){
     gap = '<span class="gap">최저 호가가 ' + (d ? won(Math.abs(d)) + (d > 0 ? " 높음" : " 낮음") : "같음") + '</span>';
   }
   hero.appendChild(el('<div class="now">' +
-    '<div class="now-label">' + TRADE[w.trade] + ' 최저 호가<span class="now-when">' + slotLabel(snap.slot) + '</span></div>' +
+    '<div class="now-label">' + TRADE[w.trade] + ' 최저 호가<span class="now-when">' +
+      (now ? "현재 · " + clock(now.taken_at) + " 기준" : slotLabel(snap.slot)) + '</span></div>' +
     '<div class="now-big"><b>' + won(snap.min_price) + '</b>' + (before ? chg(snap.min_price, before.min_price) : "") + '</div>' +
     '<div class="now-stats">' +
       '<div><span class="lbl">중간</span><b>' + won(snap.med_price) + '</b></div>' +
@@ -168,7 +181,8 @@ function paintWatch(body, hero, w, history, at, mine){
 
   body.innerHTML = "";
   function pick(i){
-    nav.set("/w/" + encodeURIComponent(w.id) + (i === history.length - 1 ? "" : "/" + history[i].slot));
+    nav.set("/w/" + encodeURIComponent(w.id) +
+      (i === "now" ? "/now" : i === history.length - 1 ? "" : "/" + history[i].slot));
   }
 
   /* 호가 흐름 — 그날그날 호가가 걸쳐 있던 폭과 실거래를 한 그림에 */
@@ -176,15 +190,18 @@ function paintWatch(body, hero, w, history, at, mine){
     '<span class="card-n">' + history.length + '일</span></h3></div></div>');
   chart.appendChild(flowChart(history.map(function(s){
     return { slot: s.slot, label: slotLabel(s.slot), min: s.min_price, med: s.med_price, max: s.max_price, count: s.count };
-  }), w.deals, at, pick));
+  }), w.deals, live ? history.length - 1 : at, pick));
   chart.appendChild(flowLegend(liveDeals(w).length > 0));
   body.appendChild(chart);
 
   /* 어느 날을 볼지 — 최근 것이 앞에 */
   var row = el('<div class="chiprow slotrow"></div>');
+  var nowChip = el('<button class="chip live" type="button" aria-pressed="' + !!live + '"><i></i>현재</button>');
+  ripple(nowChip, function(){ pick("now"); });
+  row.appendChild(nowChip);
   for (var i = history.length - 1; i >= 0; i--){
     (function(i){
-      var b = el('<button class="chip" type="button" aria-pressed="' + (i === at) + '">' +
+      var b = el('<button class="chip" type="button" aria-pressed="' + (!live && i === at) + '">' +
         slotShort(history[i].slot) + '</button>');
       ripple(b, function(){ pick(i); });
       row.appendChild(b);
@@ -192,30 +209,33 @@ function paintWatch(body, hero, w, history, at, mine){
   }
   body.appendChild(row);
 
-  var list = el('<div class="card" style="margin-top:12px"><div class="card-head"><h3>호가 목록' +
-    '<span class="card-n">' + snap.count + '건</span></h3></div>' +
-    '<p class="card-empty">불러오는 중…</p></div>');
+  var list = el('<div class="card" style="margin-top:12px"><div class="card-head"><h3>' +
+    (live ? "지금 호가 목록" : "호가 목록") +
+    (live === "wait" ? '' : '<span class="card-n">' + snap.count + '건</span>') + '</h3></div>' +
+    '<p class="card-empty">' + (live === "wait" ? "지금 올라와 있는 매물을 받아오는 중…" : "불러오는 중…") + '</p></div>');
   body.appendChild(list);
   body.appendChild(dealsCard(w));
   body.appendChild(removeFoot(w));
 
-  Store.snapshot(w.id, snap.slot).then(function(data){
+  if (live === "wait") return;
+  (now ? Promise.resolve(live) : Store.snapshot(w.id, snap.slot)).then(function(data){
     if (mine !== shown || !data || !list.parentNode) return;
     list.querySelector(".card-empty").remove();
     var key = function(l){ return (l.src || "zigbang") + ":" + l.id; };
-    var now = (data.snapshot && data.snapshot.listings) || [];
+    var rows = (data.snapshot && data.snapshot.listings) || [];
     var was = data.previous ? data.previous.listings || [] : null;
     var wasBy = {}, nowBy = {};
     (was || []).forEach(function(l){ wasBy[key(l)] = l; });
-    now.forEach(function(l){ nowBy[key(l)] = l; });
+    rows.forEach(function(l){ nowBy[key(l)] = l; });
     /* 어제는 받지 못한 곳의 매물을 오늘 '신규'라 부르면 거짓말이다 */
     var hadSrc = {};
     (was || []).forEach(function(l){ hadSrc[l.src || "zigbang"] = true; });
     var nowSrc = {};
-    now.forEach(function(l){ nowSrc[l.src || "zigbang"] = true; });
+    rows.forEach(function(l){ nowSrc[l.src || "zigbang"] = true; });
 
-    if (!now.length) list.appendChild(el('<p class="card-empty">이날은 올라온 매물이 없었습니다.</p>'));
-    now.forEach(function(l){
+    if (!rows.length) list.appendChild(el('<p class="card-empty">' +
+      (now ? "지금은 올라온 매물이 없습니다." : "이날은 올라온 매물이 없었습니다.") + '</p>'));
+    rows.forEach(function(l){
       var mark = "", o = wasBy[key(l)];
       if (was && hadSrc[l.src || "zigbang"]){
         if (!o) mark = '<span class="badge new">신규</span>';
@@ -228,11 +248,11 @@ function paintWatch(body, hero, w, history, at, mine){
     var sources = (data.snapshot && data.snapshot.sources) || {};
     var failed = Object.keys(sources).filter(function(k){ return sources[k] === "fail"; });
     if (failed.length) list.appendChild(el('<p class="src-note">' +
-      failed.map(function(k){ return PLATFORM[k] || k; }).join(" · ") + ' 매물은 이날 받지 못했습니다.</p>'));
+      failed.map(function(k){ return PLATFORM[k] || k; }).join(" · ") + ' 매물은 ' + (now ? "지금" : "이날") + ' 받지 못했습니다.</p>'));
 
     var gone = (was || []).filter(function(l){ return !nowBy[key(l)] && nowSrc[l.src || "zigbang"]; });
     if (gone.length){
-      var card = el('<div class="card dashed gone"><div class="card-head"><h3>직전 기록 이후 빠진 매물' +
+      var card = el('<div class="card dashed gone"><div class="card-head"><h3>' + (now ? "마지막 기록 이후 빠진 매물" : "직전 기록 이후 빠진 매물") +
         '<span class="card-n">' + gone.length + '건</span></h3></div></div>');
       gone.forEach(function(l){ card.appendChild(askRow(l, "", true)); });
       list.parentNode.insertBefore(card, list.nextSibling);
@@ -266,7 +286,7 @@ function dealsCard(w){
   var card = el('<div class="card t-deal" style="margin-top:12px"><div class="card-head"><h3>최근 실거래' +
     (deals.length ? '<span class="card-n">' + deals.length + '건</span>' : '') + '</h3></div></div>');
   if (!deals.length){
-    card.appendChild(el('<p class="card-empty">' + (Store.deals
+    card.appendChild(el('<p class="card-empty">' + (w.deals_error ? "실거래가를 받아오지 못했습니다 — " + esc(w.deals_error) : Store.deals
       ? (w.exclusive_m2 ? "최근 석 달 안에 신고된 거래가 없습니다." : "이 평형의 전용 면적을 몰라 실거래를 가려낼 수 없습니다.")
       : "실거래가 인증키(MOLIT_SERVICE_KEY)를 넣으면 국토교통부 실거래가를 함께 보여줍니다.") + '</p>'));
     return card;

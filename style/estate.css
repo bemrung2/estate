@@ -225,3 +225,6 @@ a.ask:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; bord
 .card.t-deal{ --accent: var(--chart-deal); }
 .hero-sub.links{ margin-top: 7px; }
 .fld-hint a{ color: var(--signal); font-weight: 600; }
+/* '현재' — 기록이 아니라 지금 받아 오는 것. 점 하나가 그 뜻이다 */
+.chip.live{ display: inline-flex; align-items: center; gap: 6px; }
+.chip.live i{ width: 6px; height: 6px; border-radius: 50%; background: var(--up); flex-shrink: 0; }

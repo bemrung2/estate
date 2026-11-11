@@ -41,6 +41,7 @@ export var Store = {
   watch(id){ return this.watches.filter(function(w){ return w.id === id; })[0] || null; },
   history(id){ return ask("api/watch?id=" + encodeURIComponent(id)); },
   snapshot(id, slot){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=" + encodeURIComponent(slot)); },
+  live(id){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=now"); },
   search(q){ return ask("api/search?q=" + encodeURIComponent(q)); },
   types(complexId){ return ask("api/search?complex=" + encodeURIComponent(complexId)); },
   findNaver(name){ return ask("api/search?naver=" + encodeURIComponent(name)); },

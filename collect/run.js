@@ -40,6 +40,102 @@ function keep(l) {
   return { src: l.src, id: l.id, item: l.item, price: l.price, dong: l.dong, floor: l.floor, title: l.title, n: l.n };
 }
 
+/* Ask every platform this 단지 · 거래 is linked to. → { got: {platform: listings}, state, failed } */
+async function fetchGroup(group) {
+  const head = group[0];
+  const got = {}, state = {}, failed = [];
+  try {
+    got.zigbang = (await zigbang.catalog(head.complex_id, head.trade)).listings;
+    state.zigbang = "ok";
+  } catch (e) {
+    state.zigbang = "fail";
+    failed.push({ complex: head.complex_name, source: "직방", error: why(e) });
+  }
+  const naverId = (group.find((w) => w.naver_id) || {}).naver_id;
+  if (naverId) {
+    try {
+      got.naver = (await naver.catalog(naverId, head.trade)).listings;
+      state.naver = "ok";
+    } catch (e) {
+      state.naver = "fail";
+      failed.push({ complex: head.complex_name, source: "네이버 부동산", error: why(e) });
+    }
+  }
+  return { got, state, failed };
+}
+
+/* One watch's list out of what the platforms answered. A platform that did not
+   answer keeps what `before` (today's earlier record, if any) had from it. */
+function listingsFor(w, fetched, before) {
+  const sources = Object.assign({}, before && before.sources);
+  let listings = [];
+  Object.keys(PLATFORMS).forEach((src) => {
+    if (fetched.got[src]) {
+      const mine = src === "zigbang"
+        ? fetched.got[src].filter((l) => l.type === w.room_type_id)
+        : fetched.got[src].filter((l) => naver.sameType(l, w));
+      listings = listings.concat(mine.map(keep));
+      sources[src] = "ok";
+    } else {
+      const kept = ((before && before.listings) || []).filter((l) => (l.src || "zigbang") === src);
+      listings = listings.concat(kept);
+      if (fetched.state[src] && !kept.length && sources[src] !== "ok") sources[src] = "fail";
+    }
+  });
+  listings.sort((a, b) => a.price - b.price);
+  return { listings, sources };
+}
+
+/*
+ * What a watch needs to know about itself before 실거래가 and 네이버 can be
+ * matched to it: its areas (공급 · 전용) and where the 단지 stands. Watches
+ * registered before these were recorded get them filled in here.
+ * Returns the group as it now is.
+ */
+async function ensure(data, group) {
+  const head = group[0];
+  const patches = {};
+  const note = (id, fields) => { patches[id] = Object.assign(patches[id] || {}, fields); };
+  if (group.some((w) => !Number(w.exclusive_m2) || !Number(w.supply_m2))) {
+    const types = await zigbang.roomTypes(head.complex_id);
+    group.forEach((w) => {
+      const t = types.find((x) => x.id === w.room_type_id);
+      if (!t) return;
+      if (!Number(w.supply_m2) && t.supply) note(w.id, { supply_m2: t.supply });
+      if (!Number(w.exclusive_m2) && t.exclusive) note(w.id, { exclusive_m2: t.exclusive });
+    });
+  }
+  if (group.some((w) => !w.lawd_cd)) {
+    const where = await zigbang.place(head.complex_id);
+    group.forEach((w) => { if (!w.lawd_cd) note(w.id, where); });
+  }
+  for (const id of Object.keys(patches)) await data.patchWatch(id, patches[id]);
+  return group.map((w) => Object.assign({}, w, patches[w.id]));
+}
+
+/* 실거래가 for one group; returns how many deals were found */
+async function refreshDeals(data, group, cache) {
+  if (!molit.enabled()) return 0;
+  const found = await molit.deals(group, cache || {});
+  let n = 0;
+  for (const w of group) {
+    if (!found || !found[w.id]) continue;
+    await data.patchWatch(w.id, { deals: molit.merge(w.deals, found[w.id]), deals_at: new Date().toISOString() });
+    n += found[w.id].length;
+  }
+  return n;
+}
+
+/* What is listed right now, without recording it. */
+async function peek(watch) {
+  const fetched = await fetchGroup([watch]);
+  const made = listingsFor(watch, fetched, null);
+  return {
+    watch_id: watch.id, slot: "now", taken_at: new Date().toISOString(),
+    ...stats(made.listings), listings: made.listings, sources: made.sources
+  };
+}
+
 /* opts.only  collect just these watch ids */
 async function run(data, opts) {
   opts = opts || {};
@@ -58,71 +154,29 @@ async function run(data, opts) {
   const cache = {};
   let first = true;
   for (const key of Object.keys(groups)) {
-    const group = groups[key];
+    let group = groups[key];
     const head = group[0];
     if (!first) await pause(400);          /* 남의 서버다 — 몰아치지 않는다 */
     first = false;
 
-    const got = {};                        /* platform → listings, for the ones that answered */
-    const state = {};
-    try {
-      got.zigbang = (await zigbang.catalog(head.complex_id, head.trade)).listings;
-      state.zigbang = "ok";
-    } catch (e) {
-      state.zigbang = "fail";
-      report.failed.push({ complex: head.complex_name, source: "직방", error: why(e) });
-    }
-    const naverId = (group.find((w) => w.naver_id) || {}).naver_id;
-    if (naverId) {
-      try {
-        got.naver = (await naver.catalog(naverId, head.trade)).listings;
-        state.naver = "ok";
-      } catch (e) {
-        state.naver = "fail";
-        report.failed.push({ complex: head.complex_name, source: "네이버 부동산", error: why(e) });
-      }
-    }
+    try { group = await ensure(data, group); }
+    catch (e) { report.failed.push({ complex: head.complex_name, source: "단지 정보", error: why(e) }); }
 
-    if (Object.keys(got).length) {
+    const fetched = await fetchGroup(group);
+    fetched.failed.forEach((f) => report.failed.push(f));
+    if (Object.keys(fetched.got).length) {
       const taken = new Date().toISOString();
       for (const w of group) {
-        const before = await data.snapshot(w.id, slot);
-        const sources = Object.assign({}, before && before.sources);
-        let listings = [];
-        Object.keys(PLATFORMS).forEach((src) => {
-          if (got[src]) {
-            const mine = src === "zigbang"
-              ? got[src].filter((l) => l.type === w.room_type_id)
-              : got[src].filter((l) => naver.sameType(l, w));
-            listings = listings.concat(mine.map(keep));
-            sources[src] = "ok";
-          } else {
-            /* 이번에 답하지 않은 곳은 오늘 먼저 받아둔 것을 그대로 둔다 */
-            const kept = ((before && before.listings) || []).filter((l) => (l.src || "zigbang") === src);
-            listings = listings.concat(kept);
-            if (state[src] && !kept.length && sources[src] !== "ok") sources[src] = "fail";
-          }
-        });
-        listings.sort((a, b) => a.price - b.price);
-        await data.putSnapshot({ watch_id: w.id, slot, taken_at: taken, ...stats(listings), listings, sources });
+        const made = listingsFor(w, fetched, await data.snapshot(w.id, slot));
+        await data.putSnapshot({ watch_id: w.id, slot, taken_at: taken, ...stats(made.listings), ...made });
         report.saved++;
       }
     }
 
-    if (molit.enabled()) {
-      try {
-        const found = await molit.deals(group, cache);
-        for (const w of group) {
-          if (!found || !found[w.id]) continue;
-          await data.patchWatch(w.id, { deals: molit.merge(w.deals, found[w.id]), deals_at: new Date().toISOString() });
-          report.deals += found[w.id].length;
-        }
-      } catch (e) {
-        report.failed.push({ complex: head.complex_name, source: "실거래가", error: why(e) });
-      }
-    }
+    try { if (molit.enabled()) report.deals += await refreshDeals(data, group, cache); }
+    catch (e) { report.failed.push({ complex: head.complex_name, source: "실거래가", error: why(e) }); }
   }
   return report;
 }
 
-module.exports = { run, slotOf, stats, PLATFORMS };
+module.exports = { run, peek, ensure, refreshDeals, slotOf, stats, PLATFORMS };

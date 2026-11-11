@@ -4,32 +4,15 @@ on:
   push:
     paths: [".github/workflows/probe.yml"]
 jobs:
-  naver:
+  hogangnono:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - name: raw
+      - name: bundle
         run: |
-          node -e '
-          const urls = [
-            "https://m.land.naver.com/complex/getComplexArticleList?hscpNo=111515&tradTpCd=A1&order=prc&showR0=N&page=1",
-            "https://m.land.naver.com/search/result/%ED%97%AC%EB%A6%AC%EC%98%A4%EC%8B%9C%ED%8B%B0",
-            "https://m.land.naver.com/complex/info/111515",
-            "https://new.land.naver.com/api/complexes/111515?sameAddressGroup=false",
-            "https://fin.land.naver.com/complexes/111515",
-            "https://hogangnono.com/api/v2/searches?query=x"
-          ];
-          (async () => {
-            for (const u of urls) {
-              try {
-                const r = await fetch(u, { redirect: "manual", headers: { accept: "application/json" }, signal: AbortSignal.timeout(15000) });
-                const t = await r.text();
-                console.log("\n==", u, "\n  status", r.status, "location", r.headers.get("location"), "len", t.length);
-                console.log(" ", t.slice(0, 1500).replace(/\s+/g, " "));
-              } catch (e) { console.log("\n==", u, "\n  FAILED", e.message, e.cause && e.cause.code); }
-            }
-          })();'
-      - name: probe
-        run: node dev.js probe naver 111515 || true
+          curl -sS -m 30 "https://hogangnono.com/search?q=x" -o page.html
+          JS=$(grep -o 'https://static.hogangnono.com/dist/[^"]*desktop.js' page.html | head -1)
+          echo "bundle $JS"
+          curl -sS -m 60 "$JS" -o b.js; wc -c b.js
+          echo "--- api paths"; grep -o '"/api/[A-Za-z0-9/_${}.:?=&-]*"' b.js | sort -u | head -150
+          echo "--- search-ish"; grep -o '.\{80\}search.\{120\}' b.js | grep -i "api\|query\|keyword" | head -25
+          echo "--- apt url"; grep -o '.\{60\}"/apt/.\{80\}' b.js | head -10

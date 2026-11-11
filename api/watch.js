@@ -8,6 +8,7 @@
  *                                                                        the watch with its 실거래
  *   GET  /api/watch?id=W&slot=S     -> { ok, snapshot, previous }        the 호가 list of one day,
  *                                                                        and of the one before it
+ *   GET  /api/watch?id=W&slot=now   -> the same, asked of the platforms right now (not recorded)
  *   POST /api/watch { add: { complexId, complexName, address, trade, naver,
  *                            types:[{ id, label, supply, exclusive }] } }
  *   POST /api/watch { link: { complexId, naver } }    네이버 단지를 잇거나("" 이면) 끊는다
@@ -15,14 +16,17 @@
  */
 const lib = require("./_core.js");
 const { open } = require("./_data.js");
-const { run } = require("../collect/run.js");
+const { run, peek, ensure, refreshDeals } = require("../collect/run.js");
 const zigbang = require("../collect/zigbang.js");
 const naver = require("../collect/naver.js");
 const molit = require("../collect/molit.js");
 
 const PER_WATCH = 30;      /* a month of days on the list screen */
 const MAX_WATCHES = 40;
-const SLOT = /^\d{4}-\d{2}-\d{2}(T(00|12))?$/;   /* 예전 기록은 하루 두 번이었다 */
+const SLOT = /^\d{4}-\d{2}-\d{2}(T12)?$/;
+/* 예전에는 하루 두 번(…T00 · …T12) 기록했다. 00시 것은 더 보여주지 않는다 —
+   db/schema.sql을 다시 실행하면 표에서도 지워진다. */
+const current = (rows) => (rows || []).filter((s) => !/T00$/.test(s.slot));
 
 function clean(s, max) { return String(s == null ? "" : s).trim().slice(0, max); }
 const area = (v) => { const n = Number(v); return n > 0 && n < 1000 ? Math.round(n * 100) / 100 : null; };
@@ -47,7 +51,7 @@ module.exports = async function handler(req, res) {
       if (!id) {
         const [watches, rows] = await Promise.all([data.watches(), data.summaries()]);
         const series = {};
-        (rows || []).forEach((s) => {
+        current(rows).forEach((s) => {
           const list = (series[s.watch_id] = series[s.watch_id] || []);
           if (list.length < PER_WATCH) list.unshift(s);
         });
@@ -56,14 +60,36 @@ module.exports = async function handler(req, res) {
 
       const slot = url.searchParams.get("slot");
       if (!slot) {
-        const [watches, history] = await Promise.all([data.watches(), data.history(id)]);
-        const watch = (watches || []).find((w) => w.id === id);
+        const watches = (await data.watches()) || [];
+        let watch = watches.find((w) => w.id === id);
         if (!watch) return lib.json(res, 404, { ok: false, error: "unknown" });
-        return lib.json(res, 200, { ok: true, watch, history: (history || []).reverse() });
+        /* 면적이나 주소를 아직 모르는 관심(예전에 등록한 것)은 열 때 채운다. 그래야
+           실거래가를 가려낼 수 있다. 채웠으면 실거래가도 그 자리에서 한 번 받는다. */
+        if (!Number(watch.exclusive_m2) || !watch.lawd_cd || (molit.enabled() && !watch.deals_at)) {
+          try {
+            const group = await ensure(data, watches.filter((w) => w.complex_id === watch.complex_id && w.trade === watch.trade));
+            await refreshDeals(data, group);
+            watch = ((await data.watches()) || []).find((w) => w.id === id) || watch;
+          } catch (e) { watch = { ...watch, deals_error: String(e.message || e).slice(0, 160) }; }
+        }
+        const history = current(await data.history(id));
+        return lib.json(res, 200, { ok: true, watch, history: history.reverse() });
+      }
+
+      /* 현재: 지금 올라와 있는 것을 받아 보여주기만 한다 (기록하지 않는다) */
+      if (slot === "now") {
+        const watch = ((await data.watches()) || []).find((w) => w.id === id);
+        if (!watch) return lib.json(res, 404, { ok: false, error: "unknown" });
+        const last = current(await data.history(id))[0];
+        const [snapshot, previous] = await Promise.all([peek(watch), last ? data.snapshot(id, last.slot) : null]);
+        if (!Object.keys(snapshot.sources).some((k) => snapshot.sources[k] === "ok")) {
+          return lib.json(res, 502, { ok: false, error: "source", message: "지금은 매물을 받아오지 못했습니다." });
+        }
+        return lib.json(res, 200, { ok: true, snapshot, previous });
       }
 
       if (!SLOT.test(slot)) return lib.json(res, 400, { ok: false, error: "slot" });
-      const history = (await data.history(id)) || [];
+      const history = current(await data.history(id));
       const at = history.findIndex((s) => s.slot === slot);
       if (at < 0) return lib.json(res, 404, { ok: false, error: "unknown" });
       const before = history[at + 1];
