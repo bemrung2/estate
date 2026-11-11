@@ -55,7 +55,49 @@ async function find(name) {
   return complexNo(res.headers.get("location") || "");
 }
 
-/* 한 단지의 한 거래 유형 전부. 매물마다 공급(supply) · 전용(exclusive) 면적이 붙는다. */
+/* 매물 목록 한 쪽의 주소 */
+function pageUrl(complexId, trade, n) {
+  return BASE + "/complex/getComplexArticleList?hscpNo=" + encodeURIComponent(complexId) +
+    "&tradTpCd=" + CODE[trade] + "&order=prc&showR0=N&page=" + n;
+}
+
+/* 그 주소가 어느 단지 · 거래 · 몇 쪽이었는지 (남이 대신 받아다 준 것을 읽을 때) */
+function readUrl(url) {
+  const m = String(url || "").match(/hscpNo=(\d{1,12}).*?tradTpCd=(A1|B1).*?page=(\d{1,3})/);
+  if (!m) return null;
+  return { complexId: m[1], trade: m[2] === "A1" ? "trade" : "charter", page: Number(m[3]) };
+}
+
+/* 받은 한 쪽 → { name, listings, more }. 매물마다 공급(supply) · 전용(exclusive) 면적이 붙는다. */
+function parsePage(data) {
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); }
+    catch (e) { throw new Error("naver: JSON이 아닌 답 (" + data.slice(0, 60).replace(/\s+/g, " ") + ")"); }
+  }
+  const result = (data && data.result) || {};
+  const list = Array.isArray(result.list) ? result.list : [];
+  if (!data || !data.result) throw new Error("naver: 뜻밖의 답");
+  const listings = [];
+  list.forEach((it) => {
+    const id = String(it.atclNo || "");
+    if (!id) return;
+    listings.push({
+      src: "naver",
+      id,
+      item: id,
+      supply: parseFloat(it.spc1) || 0,
+      exclusive: parseFloat(it.spc2) || 0,
+      price: price(it.prcInfo),
+      dong: it.bildNm || "",
+      floor: String(it.flrInfo || "").split("/")[0],
+      title: it.atclFetrDesc || "",
+      n: Number(it.sameAddrCnt) || 1
+    });
+  });
+  return { name: (list[0] && list[0].atclNm) || "", listings, more: result.moreDataYn === "Y" && list.length > 0 };
+}
+
+/* 한 단지의 한 거래 유형 전부 */
 async function catalog(complexId, trade) {
   if (!CODE[trade]) throw new Error("unknown trade " + trade);
   const listings = [];
@@ -63,29 +105,10 @@ async function catalog(complexId, trade) {
   let name = "";
   for (let n = 1; n <= MAX_PAGES; n++) {
     if (n > 1) await pause(350);
-    const data = await get("/complex/getComplexArticleList?hscpNo=" + encodeURIComponent(complexId) +
-      "&tradTpCd=" + CODE[trade] + "&order=prc&showR0=N&page=" + n);
-    const result = (data && data.result) || {};
-    const list = result.list || [];
-    list.forEach((it) => {
-      const id = String(it.atclNo || "");
-      if (!id || seen[id]) return;
-      seen[id] = true;
-      name = name || it.atclNm || "";
-      listings.push({
-        src: "naver",
-        id,
-        item: id,
-        supply: parseFloat(it.spc1) || 0,
-        exclusive: parseFloat(it.spc2) || 0,
-        price: price(it.prcInfo),
-        dong: it.bildNm || "",
-        floor: String(it.flrInfo || "").split("/")[0],
-        title: it.atclFetrDesc || "",
-        n: Number(it.sameAddrCnt) || 1
-      });
-    });
-    if (result.moreDataYn !== "Y" || !list.length) break;
+    const got = parsePage(await get(pageUrl(complexId, trade, n).slice(BASE.length)));
+    name = name || got.name;
+    got.listings.forEach((l) => { if (!seen[l.id]) { seen[l.id] = true; listings.push(l); } });
+    if (!got.more) break;
   }
   return { name, listings };
 }
@@ -106,4 +129,4 @@ function sameType(listing, watch) {
   return !own || !listing.exclusive || Math.abs(listing.exclusive - own) <= NEAR;
 }
 
-module.exports = { key: "naver", name: "네이버 부동산", catalog, find, raw, sameType, price, complexNo };
+module.exports = { key: "naver", name: "네이버 부동산", catalog, find, raw, pageUrl, readUrl, parsePage, sameType, price, complexNo };

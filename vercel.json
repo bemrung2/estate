@@ -10,9 +10,12 @@
       "maxDuration": 60
     },
     "api/watch.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/probe.js": {
+      "maxDuration": 30
+    },
+    "api/relay.js": {
       "maxDuration": 30
     }
   },

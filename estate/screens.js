@@ -7,7 +7,7 @@ import { brandMark, pageFooter } from "../ui/shell.js";
 import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag, openTextDialog } from "../ui/sheet.js";
 import { won, delta, slotLabel, slotShort, dayShort, clock, floorLabel, PLATFORM,
          listingUrl, hogangnonoUrl, naverComplexUrl, naverSearchUrl } from "./format.js";
-import { sparkline, flowChart, flowLegend } from "./chart.js";
+import { sparkline, flowChart, flowLegend, dealChart } from "./chart.js";
 
 var nav = { go: function(){}, set: function(){}, reload: function(){} };
 export function wire(n){ nav = n; }
@@ -283,22 +283,89 @@ function askRow(l, mark, dead){
     : '<div class="ask">' + inner + '</div>');
 }
 
+/* 실거래를 볼 기간. 고른 것은 화면을 옮겨도 그대로다 */
+var PERIODS = [
+  { key: "3m", label: "3개월", months: 3 },
+  { key: "1y", label: "1년", months: 12 },
+  { key: "3y", label: "3년", months: 36 },
+  { key: "5y", label: "5년", months: 60 }
+];
+var period = "1y";
+var LIST_FIRST = 12;
+
+function isoDay(d){
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
 function dealsCard(w){
-  var deals = w.deals || [];
-  var card = el('<div class="card t-deal" style="margin-top:12px"><div class="card-head"><h3>최근 실거래' +
-    (deals.length ? '<span class="card-n">' + deals.length + '건</span>' : '') + '</h3></div></div>');
-  if (!deals.length){
+  var all = w.deals || [];
+  var card = el('<div class="card t-deal" style="margin-top:12px"><div class="card-head"><h3>실거래' +
+    '</h3></div></div>');
+  if (!all.length){
     card.appendChild(el('<p class="card-empty">' + (w.deals_error ? "실거래가를 받아오지 못했습니다 — " + esc(w.deals_error) : Store.deals
-      ? (w.exclusive_m2 ? "최근 석 달 안에 신고된 거래가 없습니다." : "이 평형의 전용 면적을 몰라 실거래를 가려낼 수 없습니다.")
+      ? (!w.exclusive_m2 ? "이 평형의 전용 면적을 몰라 실거래를 가려낼 수 없습니다."
+        : w.deals_complete ? "최근 5년 안에 신고된 거래가 없습니다."
+        : "실거래가를 받아오는 중입니다. 잠시 뒤 다시 열어 주세요.")
       : "실거래가 인증키(MOLIT_SERVICE_KEY)를 넣으면 국토교통부 실거래가를 함께 보여줍니다.") + '</p>'));
     return card;
   }
-  deals.slice(0, 10).forEach(function(d){
-    card.appendChild(el('<div class="deal-row' + (d.canceled ? " off" : "") + '"><b>' + won(d.price) + '</b>' +
-      '<span>' + esc(floorLabel(d.floor) || "층 미상") + (d.canceled ? " · 해제" : "") + '</span>' +
-      '<span class="when">' + d.date.slice(2).replace(/-/g, ".") + '</span></div>'));
-  });
-  card.appendChild(el('<p class="src-note">국토교통부 실거래가 공개시스템 · 전용 ' + esc(String(w.exclusive_m2)) + '㎡</p>'));
+
+  var picks = el('<div class="pickrow deal-periods"></div>');
+  var body = el('<div></div>');
+  card.appendChild(picks);
+  card.appendChild(body);
+  pickGroup(picks, PERIODS, function(){ return period; }, function(k){ period = k; paint(false); });
+
+  function paint(more){
+    var p = PERIODS.filter(function(x){ return x.key === period; })[0];
+    var to = new Date(), from = new Date(to.getFullYear(), to.getMonth() - p.months, to.getDate());
+    var fromIso = isoDay(from), toIso = isoDay(to);
+    var inRange = all.filter(function(d){ return d.date >= fromIso; });
+    var live = inRange.filter(function(d){ return !d.canceled; });
+    body.innerHTML = "";
+    if (!inRange.length){
+      body.appendChild(el('<p class="card-empty">최근 ' + p.label + ' 동안 신고된 거래가 없습니다.' +
+        ' 더 긴 기간을 골라 보세요.</p>'));
+      return note();
+    }
+    if (live.length){
+      var prices = live.map(function(d){ return d.price; });
+      var sum = prices.reduce(function(a, b){ return a + b; }, 0);
+      body.appendChild(el('<div class="now-stats deal-stats">' +
+        '<div><span class="lbl">거래</span><b>' + live.length + '건</b></div>' +
+        '<div><span class="lbl">평균</span><b>' + won(Math.round(sum / prices.length / 100) * 100) + '</b></div>' +
+        '<div><span class="lbl">최고</span><b>' + won(Math.max.apply(null, prices)) + '</b></div>' +
+        '<div><span class="lbl">최저</span><b>' + won(Math.min.apply(null, prices)) + '</b></div></div>'));
+      body.appendChild(dealChart(live, fromIso, toIso));
+      body.appendChild(el('<div class="legend"><span><i class="lg deal"></i>거래</span>' +
+        '<span><i class="lg dealavg"></i>월 평균</span></div>'));
+    }
+    /* 달마다 묶어서 — 언제 얼마나 거래됐는지가 먼저 보이게 */
+    var shownRows = more ? inRange : inRange.slice(0, LIST_FIRST);
+    var month = "";
+    shownRows.forEach(function(d){
+      var m = d.date.slice(0, 7);
+      if (m !== month){
+        month = m;
+        var n = inRange.filter(function(x){ return x.date.slice(0, 7) === m; }).length;
+        body.appendChild(el('<div class="deal-month">' + m.replace("-", ".") + '<span>' + n + '건</span></div>'));
+      }
+      body.appendChild(el('<div class="deal-row' + (d.canceled ? " off" : "") + '"><b>' + won(d.price) + '</b>' +
+        '<span>' + esc(floorLabel(d.floor) || "층 미상") + (d.canceled ? " · 해제" : "") + '</span>' +
+        '<span class="when">' + Number(d.date.slice(8, 10)) + '일</span></div>'));
+    });
+    if (!more && inRange.length > LIST_FIRST){
+      var b = el('<button class="quietbtn deal-more" type="button">나머지 ' + (inRange.length - LIST_FIRST) + '건 더 보기</button>');
+      ripple(b, function(){ paint(true); });
+      body.appendChild(b);
+    }
+    note();
+  }
+  function note(){
+    body.appendChild(el('<p class="src-note">국토교통부 실거래가 공개시스템 · 전용 ' + esc(String(w.exclusive_m2)) + '㎡' +
+      (w.deals_complete === false ? ' · 5년치를 거슬러 받는 중입니다 — 다시 열면 더 채워집니다' : '') + '</p>'));
+  }
+  paint(false);
   return card;
 }
 

@@ -65,20 +65,20 @@ module.exports = async function handler(req, res) {
         if (!watch) return lib.json(res, 404, { ok: false, error: "unknown" });
         /* 면적이나 주소를 아직 모르는 관심(예전에 등록한 것)은 열 때 채운다. 그래야
            실거래가를 가려낼 수 있다. 채웠으면 실거래가도 그 자리에서 한 번 받는다. */
-        /* 실거래가 비어 있으면 한 시간에 한 번은 다시 받아 본다 — 키를 막 넣었거나 고쳤을 때
-           다음 수집까지 기다리지 않게 */
-        const stale = molit.enabled() && (!watch.deals_at ||
-          (!(watch.deals || []).length && Date.now() - Date.parse(watch.deals_at) > 3600 * 1000));
+        /* 실거래가: 한 번도 못 받았거나, 5년치를 아직 다 못 거슬러 갔거나, 비어 있는 채로
+           10분이 지났으면 여는 김에 받는다 — 다음 수집까지 기다리지 않게 */
+        const stale = molit.enabled() && (!watch.deals_at || !molit.complete(watch) ||
+          (!(watch.deals || []).length && Date.now() - Date.parse(watch.deals_at) > 600 * 1000));
         const fresh = !Number(watch.exclusive_m2) || !watch.lawd_cd || stale;
         if (fresh || !watch.hgnn_id) {
           try {
             const group = await ensure(data, watches.filter((w) => w.complex_id === watch.complex_id && w.trade === watch.trade));
-            if (fresh) await refreshDeals(data, group);
+            if (fresh) await refreshDeals(data, group, {}, 30);
             watch = ((await data.watches()) || []).find((w) => w.id === id) || watch;
           } catch (e) { watch = { ...watch, deals_error: String(e.message || e).slice(0, 160) }; }
         }
         const history = current(await data.history(id));
-        return lib.json(res, 200, { ok: true, watch, history: history.reverse() });
+        return lib.json(res, 200, { ok: true, watch: { ...watch, deals_complete: molit.complete(watch) }, history: history.reverse() });
       }
 
       /* 현재: 지금 올라와 있는 것을 받아 보여주기만 한다 (기록하지 않는다) */

@@ -147,3 +147,79 @@ export function flowLegend(hasDeals){
     '<span><i class="lg med"></i>중간</span>' +
     (hasDeals ? '<span><i class="lg deal"></i>실거래</span>' : '') + '</div>');
 }
+
+/* ---------- 실거래 ---------- */
+/*
+ * deals  [{ date, price, floor }] 그 기간의 거래 (해제된 것은 빼고 준다)
+ * from · to  기간의 양 끝 ("2025-11-11")
+ *
+ * 거래 하나가 점 하나. 달마다의 평균을 선으로 이어 흐름을 보인다 — 거래가 없는 달은 건너뛴다.
+ */
+export function dealChart(deals, from, to){
+  var W = 360, H = 170, L = 8, R = 8, T = 16, B = 26;
+  var wrap = el('<div class="chart-wrap"></div>');
+  if (!deals.length) return wrap;
+  var t0 = time(from), t1 = time(to);
+  var lo = Infinity, hi = -Infinity;
+  deals.forEach(function(d){ lo = Math.min(lo, d.price); hi = Math.max(hi, d.price); });
+  if (hi === lo){ hi += 500; lo -= 500; }
+  function x(t){ return L + 6 + (W - L - R - 12) * (t - t0) / (t1 - t0 || 1); }
+  function y(v){ return T + (H - T - B) * (1 - (v - lo) / (hi - lo)); }
+
+  var byMonth = {};
+  deals.forEach(function(d){ (byMonth[d.date.slice(0, 7)] = byMonth[d.date.slice(0, 7)] || []).push(d.price); });
+  var avg = Object.keys(byMonth).sort().map(function(m){
+    var list = byMonth[m];
+    return { t: time(m + "-15"), v: list.reduce(function(a, b){ return a + b; }, 0) / list.length };
+  });
+
+  var svg = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="실거래 ' + deals.length +
+    '건: ' + won(lo) + '에서 ' + won(hi) + ' 사이">';
+  [hi, (hi + lo) / 2, lo].forEach(function(v, k){
+    svg += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>';
+    if (k !== 1) svg += '<text class="tick" x="' + L + '" y="' + (y(v) - 4) + '">' + won(Math.round(v)) + '</text>';
+  });
+  svg += '<text class="tick" x="' + L + '" y="' + (H - 7) + '">' + from.slice(2, 7).replace("-", ".") + '</text>' +
+    '<text class="tick" x="' + (W - R) + '" y="' + (H - 7) + '" text-anchor="end">' + to.slice(2, 7).replace("-", ".") + '</text>' +
+    '<line class="cross" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '" hidden/>';
+  if (avg.length > 1) svg += '<polyline class="line deal-avg" points="' +
+    avg.map(function(p){ return x(p.t).toFixed(1) + "," + y(p.v).toFixed(1); }).join(" ") + '"/>';
+  var marks = deals.map(function(d){ return { x: x(time(d.date)), y: y(d.price), d: d }; });
+  marks.forEach(function(m){
+    svg += '<circle class="deal pt" cx="' + m.x.toFixed(1) + '" cy="' + m.y.toFixed(1) + '" r="3.2"/>';
+  });
+  svg += '<circle class="deal" r="5" hidden/></svg>';
+  wrap.innerHTML = svg;
+
+  var node = wrap.querySelector("svg");
+  var cross = node.querySelector(".cross"), dot = node.querySelector("circle[hidden]");
+  var tip = el('<div class="chart-tip" hidden></div>');
+  wrap.appendChild(tip);
+  function show(m){
+    if (!m){ cross.setAttribute("hidden", ""); dot.setAttribute("hidden", ""); tip.hidden = true; return; }
+    cross.removeAttribute("hidden"); dot.removeAttribute("hidden");
+    cross.setAttribute("x1", m.x); cross.setAttribute("x2", m.x);
+    dot.setAttribute("cx", m.x); dot.setAttribute("cy", m.y);
+    tip.hidden = false;
+    tip.innerHTML = "";
+    tip.appendChild(document.createElement("span")).textContent =
+      m.d.date.slice(2).replace(/-/g, ".") + (m.d.floor ? " · " + m.d.floor + "층" : "");
+    tip.appendChild(document.createElement("b")).textContent = won(m.d.price);
+    var box = wrap.getBoundingClientRect();
+    var px = m.x / W * box.width;
+    tip.style.left = Math.max(0, Math.min(box.width - tip.offsetWidth, px - tip.offsetWidth / 2)) + "px";
+    tip.style.top = (m.y / H * box.height > box.height / 2 ? 0 : box.height - tip.offsetHeight - 30) + "px";
+  }
+  wrap.addEventListener("pointermove", function(e){
+    var box = wrap.getBoundingClientRect();
+    var px = (e.clientX - box.left) / box.width * W, py = (e.clientY - box.top) / box.height * H;
+    var best = null, far = Infinity;
+    marks.forEach(function(m){
+      var d = Math.abs(m.x - px) * 3 + Math.abs(m.y - py);
+      if (d < far){ far = d; best = m; }
+    });
+    show(best);
+  });
+  wrap.addEventListener("pointerleave", function(){ show(null); });
+  return wrap;
+}

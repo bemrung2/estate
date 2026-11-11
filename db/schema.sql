@@ -29,6 +29,7 @@ alter table estate_watches add column if not exists hgnn_id      text not null d
 -- 실거래: [{ id, date:"2026-10-03", price, floor, canceled }] 최근 것이 앞
 alter table estate_watches add column if not exists deals        jsonb not null default '[]'::jsonb;
 alter table estate_watches add column if not exists deals_at     timestamptz;
+alter table estate_watches add column if not exists deals_from   text;                      -- 실거래를 어느 달까지 거슬러 받았나 ("202112")
 
 -- 하루의 기록. slot은 한국 날짜 "2026-11-11". 가격은 전부 만원.
 -- listings: [{ src, id, item, price, dong, floor, title, n }]

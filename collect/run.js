@@ -122,14 +122,22 @@ async function ensure(data, group) {
   return group.map((w) => Object.assign({}, w, patches[w.id]));
 }
 
-/* 실거래가 for one group; returns how many deals were found */
-async function refreshDeals(data, group, cache) {
+/* 실거래가 for one group; returns how many deals were found. `budget` is how
+   many older months this call may reach back for (see molit.plan). */
+async function refreshDeals(data, group, cache, budget) {
   if (!molit.enabled()) return 0;
-  const found = await molit.deals(group, cache || {});
+  const todo = molit.plan(group, budget == null ? 60 : budget);
+  const found = await molit.deals(group, cache || {}, todo.months);
   let n = 0;
   for (const w of group) {
     if (!found || !found[w.id]) continue;
-    await data.patchWatch(w.id, { deals: molit.merge(w.deals, found[w.id]), deals_at: new Date().toISOString() });
+    const fields = { deals: molit.merge(w.deals, found[w.id]), deals_at: new Date().toISOString() };
+    try { await data.patchWatch(w.id, { ...fields, deals_from: todo.from }); }
+    catch (e) {
+      /* db/schema.sql을 아직 다시 실행하지 않아 deals_from 칸이 없을 때 — 거래는 남긴다 */
+      if (!/deals_from/.test(String(e.message))) throw e;
+      await data.patchWatch(w.id, fields);
+    }
     n += found[w.id].length;
   }
   return n;
@@ -188,4 +196,33 @@ async function run(data, opts) {
   return report;
 }
 
-module.exports = { run, peek, ensure, refreshDeals, slotOf, stats, PLATFORMS };
+/*
+ * 네이버 매물 한 쪽을 남이 대신 받아다 줬을 때 (api/relay.js) 오늘 기록에 끼워 넣는다.
+ * 1쪽이 오면 그 단지 · 거래의 오늘 네이버 매물을 새로 시작하고, 다음 쪽은 거기에 보탠다.
+ * → 몇 개의 관심에 몇 건이 들어갔는지
+ */
+async function absorbNaver(data, where, page) {
+  const slot = slotOf();
+  const group = ((await data.watches()) || []).filter((w) => w.naver_id === where.complexId && w.trade === where.trade);
+  let kept = 0;
+  for (const w of group) {
+    const before = await data.snapshot(w.id, slot);
+    const old = (before && before.listings) || [];
+    const others = old.filter((l) => (l.src || "zigbang") !== "naver");
+    const mine = where.page > 1 ? old.filter((l) => l.src === "naver") : [];
+    const seen = {};
+    mine.forEach((l) => { seen[l.id] = true; });
+    page.listings.filter((l) => naver.sameType(l, w)).forEach((l) => {
+      if (!seen[l.id]) { seen[l.id] = true; mine.push(keep(l)); }
+    });
+    const listings = others.concat(mine).sort((a, b) => a.price - b.price);
+    await data.putSnapshot({
+      watch_id: w.id, slot, taken_at: new Date().toISOString(), ...stats(listings), listings,
+      sources: Object.assign({}, before && before.sources, { naver: "ok" })
+    });
+    kept += mine.length;
+  }
+  return { watches: group.length, listings: kept };
+}
+
+module.exports = { run, peek, ensure, refreshDeals, absorbNaver, slotOf, stats, PLATFORMS };
