@@ -82,6 +82,19 @@ export var Store = {
     };
   },
 
+  /* 관심들의 순서를 바꾼다. → 되돌리는 함수 */
+  reorder(ids, onDone){
+    var self = this, before = this.watches.map(function(w){ return w.id; });
+    function apply(order){
+      var at = {};
+      order.forEach(function(id, i){ at[id] = i; });
+      self.watches.sort(function(a, b){ return (at[a.id] == null ? 1e9 : at[a.id]) - (at[b.id] == null ? 1e9 : at[b.id]); });
+      return self.post({ order: order }).catch(function(e){ toast("순서를 저장하지 못했습니다 — " + e.message, true); });
+    }
+    apply(ids);
+    return function(){ apply(before); if (onDone) onDone(); };
+  },
+
   watch(id){ return this.watches.filter(function(w){ return w.id === id; })[0] || null; },
   history(id){ return ask("api/watch?id=" + encodeURIComponent(id)); },
   snapshot(id, slot){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=" + encodeURIComponent(slot)); },

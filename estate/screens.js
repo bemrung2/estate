@@ -40,11 +40,12 @@ export function renderList(view){
     ripple(mode, function(){ setDense(!dense()); renderList(view); });
     head.appendChild(mode);
   }
-  if (Store.state === "ok" && Store.auth){
-    /* 주인이 로그인했으면 나가는 단추, 아니면 들어오는 단추 */
-    var sign = el('<button class="icon-btn" type="button" aria-label="' + (Store.me ? "로그아웃" : "카카오 로그인") + '">' +
-      icon(Store.me ? "logout" : "login") + '</button>');
-    ripple(sign, function(){ if (Store.me) location.href = "api/auth?logout"; else openLoginDialog(); });
+  if (Store.state === "ok"){
+    /* 주인이 로그인했으면 나가는 단추, 아니면 들어오는 단추. 로그인이 아직 차려지지 않았으면
+       누르는 길에 무엇을 넣어야 하는지 알려준다 (api/auth.js). */
+    var sign = el('<button class="icon-btn" type="button" aria-label="' + (Store.auth && Store.me ? "로그아웃" : "카카오 로그인") + '">' +
+      icon(Store.auth && Store.me ? "logout" : "login") + '</button>');
+    ripple(sign, function(){ if (Store.auth && Store.me) location.href = "api/auth?logout"; else openLoginDialog(); });
     head.appendChild(sign);
   }
   head.appendChild(themeButton(function(){ renderList(view); }));
@@ -77,9 +78,14 @@ export function renderList(view){
         var box = el('<div class="trip-card dense-card"><div class="dense-head">' +
           '<span class="watch-name">' + esc(g[0].complex_name) + '</span>' + place(g[0].address) + '</div></div>');
         g.forEach(function(w){ box.appendChild(watchRow(w, view)); });
+        dragToReorder(list, box, g.map(function(w){ return w.id; }), view);
         list.appendChild(box);
       });
-    } else Store.watches.forEach(function(w){ list.appendChild(watchCard(w, view)); });
+    } else Store.watches.forEach(function(w){
+      var card = watchCard(w, view);
+      dragToReorder(list, card, [w.id], view);
+      list.appendChild(card);
+    });
     var add = el('<button class="addcard" type="button">' + icon("plus") + '관심 단지 추가</button>');
     ripple(add, openAdd);
     list.appendChild(add);
@@ -193,6 +199,84 @@ function watchRow(w, view){
   swipeToDelete(row, open, w, view);
   ripple(open, function(){ nav.go("/w/" + encodeURIComponent(w.id)); });
   return row;
+}
+
+/*
+ * 카드를 길게 누르면 들려서, 위아래로 끌어 순서를 바꾼다. 손을 떼면 그 순서가 저장된다.
+ * item이 list 안에서 자리를 옮기고, ids는 그 카드가 품은 관심들이다 (간단히 보기에서는
+ * 단지 하나가 여러 평형을 품는다).
+ */
+var HOLD_MS = 420;
+function dragToReorder(list, item, ids, view){
+  if (!Store.canEdit()) return;
+  item._ids = ids;
+  var timer = null, id = null, x0 = 0, y0 = 0, lifted = false, changed = false;
+  function items(){ return Array.prototype.filter.call(list.children, function(n){ return n._ids; }); }
+  function stop(){ clearTimeout(timer); timer = null; }
+  function drop(){
+    stop();
+    if (!lifted){ id = null; return; }
+    lifted = false; id = null;
+    item.style.transition = "transform 180ms cubic-bezier(0.2, 0, 0, 1)";
+    item.style.transform = "";
+    setTimeout(function(){ item.classList.remove("lifted"); item.style.transition = ""; }, 180);
+    list.classList.remove("sorting");
+    if (!changed) return;
+    var order = [];
+    items().forEach(function(n){ order = order.concat(n._ids); });
+    var undo = Store.reorder(order, function(){ renderList(view); });
+    toastUndo("순서를 바꿨습니다.", undo, "edit");
+  }
+  item.addEventListener("pointerdown", function(e){
+    if ((e.button && e.button !== 0) || items().length < 2) return;
+    id = e.pointerId; x0 = e.clientX; y0 = e.clientY; changed = false;
+    stop();
+    timer = setTimeout(function(){
+      timer = null;
+      if (item.querySelector(".swiped") || item.classList.contains("swiped")) return;
+      lifted = true;
+      if (opened) opened();
+      item.classList.add("lifted");
+      list.classList.add("sorting");
+      try{ item.setPointerCapture(id); }catch(err){ /* 이미 놓았다 */ }
+      if (navigator.vibrate) navigator.vibrate(12);
+    }, HOLD_MS);
+  });
+  item.addEventListener("pointermove", function(e){
+    if (e.pointerId !== id) return;
+    if (!lifted){
+      if (Math.abs(e.clientX - x0) > 8 || Math.abs(e.clientY - y0) > 8) stop();      /* 밀거나 넘기는 중이다 */
+      return;
+    }
+    var dy = e.clientY - y0;
+    item.style.transform = "translateY(" + dy + "px) scale(1.02)";
+    /* 들린 카드의 가운데가 이웃의 가운데를 넘으면 자리를 바꾼다 */
+    var box = item.getBoundingClientRect(), mid = box.top + box.height / 2;
+    var all = items(), at = all.indexOf(item), other = null, before = false;
+    var up = all[at - 1], down = all[at + 1];
+    if (up){ var u = up.getBoundingClientRect(); if (mid < u.top + u.height / 2){ other = up; before = true; } }
+    if (!other && down){ var d = down.getBoundingClientRect(); if (mid > d.top + d.height / 2) other = down; }
+    if (!other) return;
+    var was = item.offsetTop;
+    list.insertBefore(item, before ? other : other.nextSibling);
+    y0 += item.offsetTop - was;                       /* 자리가 옮겨진 만큼 기준도 옮긴다 */
+    item.style.transform = "translateY(" + (e.clientY - y0) + "px) scale(1.02)";
+    changed = true;
+  });
+  item.addEventListener("pointerup", drop);
+  item.addEventListener("pointercancel", drop);
+  /* 들린 동안에는 화면이 따라 구르지 않게, 그리고 놓는 손이 카드를 여는 누름이 되지 않게 */
+  item.addEventListener("touchmove", function(e){ if (lifted) e.preventDefault(); }, { passive: false });
+  item.addEventListener("contextmenu", function(e){ if (lifted || timer) e.preventDefault(); });
+  item.addEventListener("click", function(e){
+    if (!item._held) return;
+    item._held = false; e.preventDefault(); e.stopPropagation();
+  }, true);
+  item.addEventListener("pointerup", function(){
+    if (!item.classList.contains("lifted")) return;
+    item._held = true;
+    setTimeout(function(){ item._held = false; }, 400);
+  }, true);
 }
 
 function watchCard(w, view){
@@ -429,7 +513,7 @@ var PERIODS = [
   { key: "3m", label: "최근 3개월", said: "최근 3개월", months: 3 }
 ];
 var period = "5y";
-var LIST_FIRST = 30;
+var LIST_FIRST = 15;
 
 function since(months){
   var to = new Date();

@@ -14,6 +14,7 @@
  *   POST /api/watch { link: { complexId, naver } }    네이버 단지를 잇거나("" 이면) 끊는다
  *   POST /api/watch { importNaver: { complex, rows:[…] } }   크롬 확장이 네이버 매물 탭에서 옮겨 온 줄들
  *   POST /api/watch { remove: id }
+ *   POST /api/watch { order: [id…] }                  첫 화면의 순서
  *
  * 등록 · 연결 · 삭제는 카카오로 로그인한 주인만 한다 (api/_auth.js).
  */
@@ -147,6 +148,19 @@ module.exports = async function handler(req, res) {
       }
 
       const existing = (await data.watches()) || [];
+
+      /* 첫 화면에서 끌어 바꾼 순서. 적히지 않은 관심은 그 뒤에 원래 차례대로 선다. */
+      if (body && Array.isArray(body.order)) {
+        const want = body.order.slice(0, 200).map((id) => clean(id, 80));
+        const known = want.filter((id, i) => want.indexOf(id) === i && existing.some((w) => w.id === id));
+        const rest = existing.filter((w) => known.indexOf(w.id) < 0).map((w) => w.id);
+        const all = known.concat(rest);
+        for (let i = 0; i < all.length; i++) {
+          const w = existing.find((x) => x.id === all[i]);
+          if (Number(w.ord) !== i + 1) await data.patchWatch(w.id, { ord: i + 1 });
+        }
+        return lib.json(res, 200, { ok: true });
+      }
 
       if (body && body.link) {
         const complexId = clean(body.link.complexId, 12);
