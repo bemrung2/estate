@@ -403,3 +403,22 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 .mergebtn[aria-checked="true"] i::after{ transform: translateX(12px); }
 .mergebtn:focus-visible{ outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 6px; }
 .pick-g{ margin-left: 6px; font-size: 10.5px; font-weight: 600; opacity: 0.7; }
+/* ---------- 정렬 · 카드를 조금 더 작게 ---------- */
+.sortbar{ margin: 0 0 4px; padding-bottom: 10px; }
+.sortbar .pick{ padding: 5px 11px; font-size: 12px; }
+.sort-dir{ margin-left: 3px; font-size: 11px; }
+.trip-list{ gap: 10px; }
+.trip-card, .trip-open{ border-radius: 18px; }
+.trip-open{ padding: 13px 14px 11px; }
+.watch-name{ font-size: 17px; }
+.watch-id{ gap: 4px; }
+.sub-place{ font-size: 11.5px; padding: 2px 7px 2px 5px; }
+.watch-type{ font-size: 11px; padding: 3px 8px; }
+.watch-mid{ margin-top: 10px; }
+.watch-price .lbl{ font-size: 10.5px; }
+.watch-price b{ font-size: clamp(15px, 4.6vw, 18px); }
+.watch-gap{ margin-top: 8px; padding: 6px 9px; font-size: 11px; }
+.watch-gap .chg{ font-size: 12px; }
+.watch-foot{ margin-top: 9px; padding-top: 8px; font-size: 11.5px; }
+.watch-foot .spark{ width: 56px; height: 18px; }
+.watch-when{ font-size: 10.5px; }

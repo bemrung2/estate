@@ -52,6 +52,61 @@ function outlink(label, url){
 }
 
 /* ---------- the list ---------- */
+/* 카드를 세우는 차례. "mine"은 길게 눌러 끌어 정한 순서다. 고른 것은 이 브라우저가 기억한다.
+   같은 것을 한 번 더 누르면 방향이 뒤집힌다. */
+var SORTS = [
+  { key: "mine", label: "내 순서" },
+  { key: "place", label: "주소순", dir: 1 },
+  { key: "added", label: "등록순", dir: -1 },
+  { key: "peak", label: "실거래 최고가순", dir: -1 },
+  { key: "ask", label: "최저 호가순", dir: -1 }
+];
+function sortNow(){
+  try{ var v = JSON.parse(localStorage.getItem("estate.sort") || "null"); if (v && v.key) return v; }catch(e){ /* 기억 못 해도 된다 */ }
+  return { key: "mine", dir: 1 };
+}
+function setSort(v){ try{ localStorage.setItem("estate.sort", JSON.stringify(v)); }catch(e){ /* 사생활 보호 모드 */ } }
+function lastAsk(w){
+  var series = Store.series[w.id] || [], last = series[series.length - 1];
+  return last && last.min_price != null ? last.min_price : null;
+}
+function sorted(watches){
+  var how = sortNow();
+  if (how.key === "mine") return watches;
+  var val = {
+    place: function(w){ return [w.address || "", w.complex_name || ""].join(" "); },
+    added: function(w){ return w.created_at || ""; },
+    peak: function(w){ return w.high_1y ? w.high_1y.price : null; },
+    ask: lastAsk
+  }[how.key];
+  if (!val) return watches;
+  return watches.map(function(w, i){ return { w: w, v: val(w), i: i }; }).sort(function(a, b){
+    /* 값이 없는 것은 어느 방향이든 맨 뒤 */
+    if (a.v == null || b.v == null) return (a.v == null) - (b.v == null) || a.i - b.i;
+    var c = typeof a.v === "string" ? a.v.localeCompare(b.v, "ko") : a.v - b.v;
+    /* 같은 단지의 평형들은 작은 것부터 */
+    return c * how.dir || (Number(a.w.supply_m2) || 0) - (Number(b.w.supply_m2) || 0) || a.i - b.i;
+  }).map(function(x){ return x.w; });
+}
+function sortBar(view){
+  var how = sortNow();
+  var bar = el('<div class="pickrow scroll sortbar" role="group" aria-label="정렬"></div>');
+  SORTS.forEach(function(o){
+    var on = o.key === how.key;
+    var b = el('<button class="pick" type="button" aria-pressed="' + on + '">' + o.label +
+      (on && o.dir ? '<span class="sort-dir">' + (how.dir > 0 ? "↑" : "↓") + '</span>' : '') + '</button>');
+    ripple(b, function(){
+      setSort(on && o.dir ? { key: o.key, dir: -how.dir } : { key: o.key, dir: o.dir || 1 });
+      var x = bar.scrollLeft;
+      renderList(view);
+      var again = view.querySelector(".sortbar");
+      if (again) again.scrollLeft = x;
+    });
+    bar.appendChild(b);
+  });
+  return bar;
+}
+
 export function renderList(view){
   var pad = el('<div class="pad"></div>');
   var head = el('<div class="page-head"><div class="page-title">' + brandMark() + '</div></div>');
@@ -89,10 +144,13 @@ export function renderList(view){
     ripple(blank.querySelector(".btn"), openAdd);
     pad.appendChild(blank);
   } else {
+    var shownWatches = sorted(Store.watches);
+    var mineOrder = sortNow().key === "mine";
+    if (Store.watches.length > 1) pad.appendChild(sortBar(view));
     if (dense()){
       /* 간단히 보기: 단지 하나가 카드 하나, 그 안에 평형이 한 줄씩 */
       var groups = [], byComplex = {};
-      Store.watches.forEach(function(w){
+      shownWatches.forEach(function(w){
         if (!byComplex[w.complex_id]) groups.push(byComplex[w.complex_id] = []);
         byComplex[w.complex_id].push(w);
       });
@@ -100,12 +158,12 @@ export function renderList(view){
         var box = el('<div class="trip-card dense-card"><div class="dense-head">' +
           '<span class="watch-name">' + esc(g[0].complex_name) + '</span>' + place(g[0].address) + '</div></div>');
         g.forEach(function(w){ box.appendChild(watchRow(w, view)); });
-        dragToReorder(list, box, g.map(function(w){ return w.id; }), view);
+        if (mineOrder) dragToReorder(list, box, g.map(function(w){ return w.id; }), view);
         list.appendChild(box);
       });
-    } else Store.watches.forEach(function(w){
+    } else shownWatches.forEach(function(w){
       var card = watchCard(w, view);
-      dragToReorder(list, card, [w.id], view);
+      if (mineOrder) dragToReorder(list, card, [w.id], view);
       list.appendChild(card);
     });
     var add = el('<button class="addcard" type="button">' + icon("plus") + '관심 단지 추가</button>');
