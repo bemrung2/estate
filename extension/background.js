@@ -114,25 +114,32 @@ async function read(complex) {
   }
 }
 
+/* 닿지 못했을 때, 어디서 막혔는지 가려낸다 → 사람이 읽을 한 줄 */
+async function whyNot(site) {
+  const v = chrome.runtime.getManifest().version;
+  const u = new URL(site);
+  const allowed = await chrome.permissions.contains({ origins: [u.protocol + "//" + u.hostname + "/*"] }).catch(() => false);
+  /* 답의 내용은 못 보지만, 서버까지 가기는 하는지 */
+  const reached = await fetch(site + "/api/watch", { mode: "no-cors", cache: "no-store" }).then(() => true, () => false);
+  if (!reached) return "이 컴퓨터에서 " + u.hostname + "에 연결이 되지 않습니다 (확장 " + v + ", 권한 " + (allowed ? "있음" : "없음") + ").";
+  return "서버에는 닿지만 답을 읽을 수 없습니다 (확장 " + v + ", 권한 " + (allowed ? "있음" : "없음") +
+    "). chrome://extensions 에서 이 확장을 '삭제'한 뒤 extension 폴더를 다시 불러와 주세요.";
+}
+
 /* BEMESTATE에 묻는다. 닿지 못하면 왜인지 알 수 있는 말로 던진다. */
 async function api(site, init) {
-  /* vercel.app 주소에는 권한이 있어 로그인 쿠키도 함께 간다 (보호된 배포 주소일 때 필요하다) */
-  const mine = /\.vercel\.app$/.test(new URL(site).hostname);
-  const ask = () => fetch(site + "/api/watch", Object.assign({ cache: "no-store", credentials: mine ? "include" : "omit" }, init));
+  const ask = () => fetch(site + "/api/watch", Object.assign({ cache: "no-store" }, init));
   let res;
   try { res = await ask(); }
   catch (e) {
     await wait(2000);
     try { res = await ask(); }
-    catch (e2) {
-      throw new Error("BEMESTATE(" + site + ")에 닿지 못했습니다. 주소가 맞는지, 배포가 끝났는지 확인해 주세요. [" +
-        String(e2.message || e2) + "]");
-    }
+    catch (e2) { throw new Error("BEMESTATE(" + site + ") — " + await whyNot(site)); }
   }
   const data = await res.json().catch(() => null);
   if (!data) {
-    throw new Error("BEMESTATE가 엉뚱한 답을 했습니다 (" + res.status + (res.redirected ? ", " + new URL(res.url).hostname + "(으)로 넘어감" : "") +
-      "). 로그인이 필요한 미리보기 주소가 아닌, 공개된 주소를 넣어 주세요.");
+    throw new Error("BEMESTATE가 엉뚱한 답을 했습니다 (" + res.status +
+      (res.redirected ? ", " + new URL(res.url).hostname + "(으)로 넘어감" : "") + ").");
   }
   if (!data.ok) throw new Error(data.message || data.error || "BEMESTATE 오류 " + res.status);
   return data;

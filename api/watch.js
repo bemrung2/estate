@@ -43,15 +43,14 @@ function brief(w) {
 }
 
 module.exports = async function handler(req, res) {
-  /* 크롬 확장(extension/)이 제 자리에서 부를 수 있게 — 확장은 이 주소에 따로 권한을 받지 않는다 */
-  const from = String(req.headers.origin || "");
-  if (/^chrome-extension:\/\/[a-p]{32}$/.test(from)) {
-    res.setHeader("access-control-allow-origin", from);
-    res.setHeader("access-control-allow-methods", "GET, POST");
-    res.setHeader("access-control-allow-headers", "content-type");
-    res.setHeader("vary", "origin");
-    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
-  }
+  /* 크롬 확장(extension/)이 제 자리에서 부를 수 있게. 로그인이 없는 곳이라 어디서 불러도
+     주소를 아는 사람이 할 수 있는 일과 같다. */
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-max-age", "86400");
+  if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+
   const home = open();
   if (home.missing.length) return lib.setupError(res, home.missing);
   const data = home.data;
