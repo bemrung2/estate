@@ -366,9 +366,33 @@ function watchCard(w, view){
 /* ---------- one watch ---------- */
 var shown = 0;       /* 늦게 도착한 답이 다른 화면을 덮지 않게 */
 
+/* 지금 열려 있는 단지 화면. 같은 단지에서 날짜만 바꿀 때는 화면을 새로 짓지 않고
+   이것을 고쳐 그린다. */
+var openWatch = null;
+
+function paintAt(o, slot, mine){
+  var at = o.history.length - 1;
+  o.history.forEach(function(s, i){ if (s.slot === slot) at = i; });
+  if (slot !== "now") return paintWatch(o.body, o.hero, o.full, o.history, at, mine, null);
+  /* 현재: 기록을 먼저 그려 두고, 지금 올라와 있는 것을 받아 오면 바꿔 그린다 */
+  paintWatch(o.body, o.hero, o.full, o.history, at, mine, "wait");
+  return Store.live(o.full.id).then(function(live){
+    if (mine !== shown || !live) return;
+    paintWatch(o.body, o.hero, o.full, o.history, at, mine, live);
+  }).catch(function(e){
+    if (mine !== shown) return;
+    toast("지금 호가를 받아오지 못했습니다 — " + e.message, true);
+    paintWatch(o.body, o.hero, o.full, o.history, at, mine, null);
+  });
+}
+
 export function renderWatch(view, id, slot){
   var w = Store.watch(id);
   var mine = ++shown;
+  if (openWatch && openWatch.w === w && openWatch.history && view.contains(openWatch.body)){
+    return paintAt(openWatch, slot, mine);
+  }
+  openWatch = null;
   var page = el('<div class="tabpad"></div>');
   var hero = el('<div class="hero"><div class="hero-top">' +
     '<button class="icon-btn hero-back" type="button" aria-label="목록으로">' + icon("back") + '</button>' +
@@ -404,19 +428,8 @@ export function renderWatch(view, id, slot){
       body.appendChild(removeFoot(w));
       return;
     }
-    var at = history.length - 1;
-    history.forEach(function(s, i){ if (s.slot === slot) at = i; });
-    if (slot !== "now") return paintWatch(body, hero, full, history, at, mine, null);
-    /* 현재: 기록을 먼저 그려 두고, 지금 올라와 있는 것을 받아 오면 바꿔 그린다 */
-    paintWatch(body, hero, full, history, at, mine, "wait");
-    return Store.live(id).then(function(live){
-      if (mine !== shown || !live) return;
-      paintWatch(body, hero, full, history, at, mine, live);
-    }).catch(function(e){
-      if (mine !== shown) return;
-      toast("지금 호가를 받아오지 못했습니다 — " + e.message, true);
-      paintWatch(body, hero, full, history, at, mine, null);
-    });
+    openWatch = { w: w, body: body, hero: hero, full: full, history: history };
+    return paintAt(openWatch, slot, mine);
   }).catch(function(e){
     if (mine !== shown) return;
     body.innerHTML = "";
@@ -462,7 +475,6 @@ function paintWatch(body, hero, w, history, at, mine, live){
     cmp +
     '</div>'));
 
-  body.innerHTML = "";
   function pick(i){
     nav.set("/w/" + encodeURIComponent(w.id) +
       (i === "now" ? "/now" : i === history.length - 1 ? "" : "/" + history[i].slot));
@@ -475,34 +487,56 @@ function paintWatch(body, hero, w, history, at, mine, live){
     return { slot: s.slot, label: slotLabel(s.slot), min: s.min_price, med: s.med_price, max: s.max_price, count: s.count };
   }), w.deals, live ? history.length - 1 : at, pick));
   chart.appendChild(flowLegend(liveDeals(w).length > 0));
-  body.appendChild(chart);
-
-  /* 어느 날을 볼지 — 최근 것이 앞에 */
-  var row = el('<div class="chiprow slotrow"></div>');
-  var nowChip = el('<button class="chip live" type="button" aria-pressed="' + !!live + '"><i></i>현재</button>');
-  ripple(nowChip, function(){ pick("now"); });
-  row.appendChild(nowChip);
-  for (var i = history.length - 1; i >= 0; i--){
-    (function(i){
-      var b = el('<button class="chip" type="button" aria-pressed="' + (!live && i === at) + '">' +
-        slotShort(history[i].slot) + '</button>');
-      ripple(b, function(){ pick(i); });
-      row.appendChild(b);
-    })(i);
-  }
-  body.appendChild(row);
 
   var list = el('<div class="card" style="margin-top:12px"><div class="card-head"><h3>' +
     (live ? "지금 호가 목록" : "호가 목록") +
     (live === "wait" ? '' : '<span class="card-n">' + snap.count + '건</span>') + '</h3></div>' +
     '<p class="card-empty">' + (live === "wait" ? "지금 올라와 있는 매물을 받아오는 중…" : "불러오는 중…") + '</p></div>');
-  body.appendChild(list);
-  body.appendChild(dealsCard(w));
-  body.appendChild(removeFoot(w));
+
+  /* 처음에는 화면을 짓고, 날짜만 바꿀 때는 달라지는 곳만 갈아 끼운다 —
+     실거래 카드와 날짜 줄은 제자리에 그대로 있다. */
+  var parts = body._parts;
+  /* 새 목록을 옛 목록 자리에 놓는다. 빠진 매물 카드(gone)도 함께 바꾼다 */
+  function showList(gone){
+    if (parts.list !== list){ parts.list.replaceWith(list); parts.list = list; }
+    if (parts.gone) parts.gone.remove();
+    parts.gone = gone || null;
+    if (gone) list.parentNode.insertBefore(gone, list.nextSibling);
+  }
+  if (!parts){
+    body.innerHTML = "";
+    body.appendChild(chart);
+    /* 어느 날을 볼지 — 최근 것이 앞에 */
+    var row = el('<div class="chiprow slotrow"></div>');
+    var chips = {};
+    chips.now = el('<button class="chip live" type="button"><i></i>현재</button>');
+    ripple(chips.now, function(){ pick("now"); });
+    row.appendChild(chips.now);
+    for (var i = history.length - 1; i >= 0; i--){
+      (function(i){
+        chips[i] = el('<button class="chip" type="button">' + slotShort(history[i].slot) + '</button>');
+        ripple(chips[i], function(){ pick(i); });
+        row.appendChild(chips[i]);
+      })(i);
+    }
+    body.appendChild(row);
+    body.appendChild(list);
+    body.appendChild(dealsCard(w));
+    body.appendChild(removeFoot(w));
+    parts = body._parts = { chart: chart, chips: chips, list: list, gone: null };
+  } else {
+    parts.chart.replaceWith(chart);
+    parts.chart = chart;
+    /* 옛 목록은 새 것이 올 때까지 흐리게 남겨 둔다 — 화면이 줄었다 늘며 튀지 않게 */
+    if (live === "wait") showList(null); else parts.list.classList.add("stale");
+  }
+  Object.keys(parts.chips).forEach(function(k){
+    parts.chips[k].setAttribute("aria-pressed", String(k === "now" ? !!live : !live && Number(k) === at));
+  });
 
   if (live === "wait") return;
   (now ? Promise.resolve(live) : Store.snapshot(w.id, snap.slot)).then(function(data){
-    if (mine !== shown || !data || !list.parentNode) return;
+    if (mine !== shown || !data) return;
     list.querySelector(".card-empty").remove();
     var key = function(l){ return (l.src || "zigbang") + ":" + l.id; };
     var rows = (data.snapshot && data.snapshot.listings) || [];
@@ -541,16 +575,18 @@ function paintWatch(body, hero, w, history, at, mine, live){
       '<p class="src-note">네이버 매물은 이날 들어오지 않았습니다 — 크롬 확장이 돌았는지 확인해 주세요.</p>'));
 
     var gone = (was || []).filter(function(l){ return !nowBy[key(l)] && nowSrc[l.src || "zigbang"]; });
+    var card = null;
     if (gone.length){
-      var card = el('<div class="card dashed gone"><div class="card-head"><h3>' + (now ? "마지막 기록 이후 빠진 매물" : "직전 기록 이후 빠진 매물") +
+      card = el('<div class="card dashed gone"><div class="card-head"><h3>' + (now ? "마지막 기록 이후 빠진 매물" : "직전 기록 이후 빠진 매물") +
         '<span class="card-n">' + gone.length + '건</span></h3></div></div>');
       gone.forEach(function(l){ card.appendChild(askRow(l, "", true)); });
-      list.parentNode.insertBefore(card, list.nextSibling);
     }
+    showList(card || null);
   }).catch(function(e){
     if (mine !== shown) return;
     var p = list.querySelector(".card-empty");
     if (p) p.textContent = "목록을 불러오지 못했습니다 — " + e.message;
+    showList(null);
   });
 }
 
