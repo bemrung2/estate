@@ -456,17 +456,16 @@ export function renderWatch(view, id, slot){
   var page = el('<div class="tabpad"></div>');
   var hero = el('<div class="hero"><div class="hero-top">' +
     '<button class="icon-btn hero-back" type="button" aria-label="목록으로">' + icon("back") + '</button>' +
-    '<div class="hero-id"><h1 class="hero-city">' + esc(w.complex_name) + '</h1></div></div>' +
+    '<div class="hero-id"><h1 class="hero-city">' + esc(w.complex_name) + '</h1></div>' +
+      outlink("호갱노노", hogangnonoUrl(w)) + '</div>' +
     '<div class="hero-sub">' + place(w.address) +
       '<span class="watch-type">' + esc(w.room_label) + '</span>' +
-      '<span class="watch-trade">' + TRADE[w.trade] + '</span></div>' +
-    '<div class="hero-sub links">' + outlink("호갱노노", hogangnonoUrl(w)) +
-      (w.naver_id ? outlink("네이버 부동산", naverComplexUrl(w.naver_id)) : '') + '</div></div>');
+      '<span class="watch-trade">' + TRADE[w.trade] + '</span></div></div>');
   ripple(hero.querySelector(".hero-back"), function(){ nav.go("/"); });
   if (!w.naver_id){
     var link = el('<button class="outlink" type="button">네이버 연결' + icon("plus") + '</button>');
     ripple(link, function(){ openNaverLink(w); });
-    hero.querySelector(".links").appendChild(link);
+    hero.querySelector(".hero-sub").appendChild(link);
   }
   page.appendChild(hero);
   var body = el('<div><div class="card"><span class="bar bar-s"></span><span class="bar bar-m"></span>' +
@@ -478,7 +477,7 @@ export function renderWatch(view, id, slot){
     if (mine !== shown || !data) return;
     var history = data.history || [];
     var full = data.watch || w;
-    var hg = hero.querySelector(".links a.outlink");
+    var hg = hero.querySelector(".hero-top a.outlink");
     if (hg) hg.href = hogangnonoUrl(full);
     body.innerHTML = "";
     if (!history.length){

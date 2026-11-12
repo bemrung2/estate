@@ -1,6 +1,9 @@
 /* What the server last said: the watch list with its recent numbers. The screens read this; nothing here knows
  * what a 단지 is beyond passing it along. */
 import { toast } from "./dom.js";
+import { typeLabel } from "../estate/format.js";
+
+function named(w){ if (w) w.room_label = typeLabel(w); return w; }
 
 async function ask(path, init){
   var res = await fetch(path, Object.assign({ cache: "no-store" }, init || {}));
@@ -35,7 +38,7 @@ export var Store = {
       this.auth = !!data.auth;
       this.me = !!data.me;
       var hidden = this._hidden;
-      this.watches = (data.watches || []).filter(function(w){ return !hidden[w.id]; });
+      this.watches = (data.watches || []).filter(function(w){ return !hidden[w.id]; }).map(named);
       this.series = data.series || {};
     }catch(e){
       this.state = "down";
@@ -96,7 +99,9 @@ export var Store = {
   },
 
   watch(id){ return this.watches.filter(function(w){ return w.id === id; })[0] || null; },
-  history(id){ return ask("api/watch?id=" + encodeURIComponent(id)); },
+  history(id){
+    return ask("api/watch?id=" + encodeURIComponent(id)).then(function(data){ if (data) named(data.watch); return data; });
+  },
   snapshot(id, slot){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=" + encodeURIComponent(slot)); },
   live(id){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=now"); },
   search(q){ return ask("api/search?q=" + encodeURIComponent(q)); },

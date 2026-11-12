@@ -424,3 +424,6 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 .watch-foot{ margin-top: 9px; padding-top: 8px; font-size: 11.5px; }
 .watch-foot .spark{ width: 56px; height: 18px; }
 .watch-when{ font-size: 10.5px; }
+/* 단지 화면: 호갱노노는 이름 옆에 작게 */
+.hero-top > .outlink{ flex-shrink: 0; margin-left: auto; align-self: center; font-size: 10.5px; padding: 2px 6px 2px 7px; }
+.hero-top > .outlink .icon{ width: 10px; height: 10px; }

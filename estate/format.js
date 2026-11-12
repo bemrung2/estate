@@ -68,3 +68,15 @@ export function naverComplexUrl(id){
 export function naverSearchUrl(name){
   return "https://m.land.naver.com/search/result/" + encodeURIComponent(name);
 }
+
+/* 평형의 이름은 "81㎡ · 25평" 꼴이다. 묶기가 처음 나왔을 때 "18~19평 · 전용 39㎡"로 적힌
+   묶음이 있어, 보여줄 때 같은 꼴로 고쳐 적는다. */
+export function typeLabel(w){
+  var m = String(w.room_label || "").match(/^(.+평)\s*·\s*전용\s*[\d.]+㎡$/);
+  if (!m) return w.room_label;
+  var m2 = (w.room_types || []).map(function(t){ return Math.floor(t.supply) || 0; }).filter(Boolean);
+  if (!m2.length && Number(w.supply_m2)) m2 = [Math.floor(w.supply_m2)];
+  if (!m2.length) return w.room_label;
+  var lo = Math.min.apply(null, m2), hi = Math.max.apply(null, m2);
+  return (lo === hi ? lo : lo + "~" + hi) + "㎡ · " + m[1];
+}
