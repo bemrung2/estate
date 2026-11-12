@@ -197,7 +197,7 @@
 }
 .now-deal .lbl{ font-size: 11px; font-weight: 600; color: var(--chart-deal); }
 .now-deal b{ font-size: 14.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
-.now-deal .gap{ margin-left: auto; font-size: 11.5px; }
+.now-deal .gap{ margin-left: auto; font-size: 11.5px; white-space: nowrap; }
 /* 밖으로 나가는 작은 단추 */
 .outlink{
   display: inline-flex; align-items: center; gap: 3px;
@@ -251,7 +251,7 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 /* 목록 카드: 최저 호가와 최근 실거래가 같은 글씨로 나란히 선다. 추이선은 아랫줄로 내려간다 */
 .watch-mid{ align-items: flex-start; gap: 14px; }
 .watch-price{ flex: 1 1 0; }
-.watch-price b{ font-size: clamp(19px, 6.2vw, 25px); white-space: nowrap; }
+.watch-price b{ font-size: clamp(16px, 5vw, 20px); white-space: nowrap; }
 .watch-price.deal .lbl{ color: var(--chart-deal); }
 .watch-foot .spark{ width: 64px; height: 22px; margin-left: auto; }
 .watch-foot .spark + .watch-when{ margin-left: 0; }

@@ -348,7 +348,7 @@ function watchCard(w, view){
         : '<b class="none">' + (last ? "매물 없음" : "아직 기록이 없습니다") + '</b>') +
     '</div>' +
     /* 호가와 실거래를 같은 크기로 나란히 — 둘을 견주는 것이 이 카드의 일이다 */
-    (deal ? '<div class="watch-price deal"><span class="lbl">최근 실거래 · ' + dayShort(deal.date) + '</span>' +
+    (deal ? '<div class="watch-price deal"><span class="lbl">직전 실거래 · ' + dayShort(deal.date) + '</span>' +
       '<b>' + won(deal.price) + '</b></div>' : '') + '</div>' +
     (pg ? '<div class="watch-gap ' + (pg.d > 0 ? "up" : pg.d < 0 ? "down" : "") + '"><span>1년 최고 실거래 ' +
       won(pg.peak.price) + ' 대비</span>' + gapMark(pg) + '<small>' + dayShort(pg.slot) + ' 호가</small></div>' : '') +
@@ -440,7 +440,7 @@ function paintWatch(body, hero, w, history, at, mine, live){
   var gap = "";
   if (deal && snap.min_price != null){
     var d = snap.min_price - deal.price;
-    gap = '<span class="gap">최저 호가가 ' + (d ? won(Math.abs(d)) + (d > 0 ? " 높음" : " 낮음") : "같음") + '</span>';
+    gap = '<span class="gap">' + (now ? "현재" : dayShort(snap.slot)) + ' 최저 호가 ' + gapMark({ d: d }) + '</span>';
   }
   hero.appendChild(el('<div class="now">' +
     '<div class="now-label">' + TRADE[w.trade] + ' 최저 호가<span class="now-when">' +
@@ -451,7 +451,7 @@ function paintWatch(body, hero, w, history, at, mine, live){
       '<div><span class="lbl">최고</span><b>' + won(snap.max_price) + '</b></div>' +
       '<div><span class="lbl">매물</span><b>' + snap.count + '건</b></div>' +
     '</div>' +
-    (deal ? '<div class="now-deal"><span class="lbl">최근 실거래</span><b>' + won(deal.price) + '</b>' +
+    (deal ? '<div class="now-deal"><span class="lbl">직전 실거래</span><b>' + won(deal.price) + '</b>' +
       '<span>' + [floorLabel(deal.floor), dayShort(deal.date)].filter(Boolean).join(" · ") + '</span>' + gap + '</div>' : '') +
     (pg ? '<div class="now-deal peak"><span class="lbl">1년 최고 실거래</span><b>' + won(pg.peak.price) + '</b>' +
       '<span>' + [floorLabel(pg.peak.floor), pg.peak.date.slice(2).replace(/-/g, ".")].filter(Boolean).join(" · ") + '</span>' +
