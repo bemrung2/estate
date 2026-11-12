@@ -49,7 +49,7 @@ create table if not exists estate_snapshots (
 
 alter table estate_snapshots add column if not exists sources jsonb not null default '{}'::jsonb;
 
--- 예전에는 하루 두 번(…T00 · …T12) 기록했다. 이제 낮 12시 한 번뿐이다:
+-- 예전에는 하루 두 번(…T00 · …T12) 기록했다. 이제 하루 한 번뿐이다:
 -- 00시 기록은 지우고, 12시 기록은 그날의 기록("2026-11-11")으로 삼는다.
 delete from estate_snapshots where slot like '%T00';
 delete from estate_snapshots a

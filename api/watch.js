@@ -15,6 +15,7 @@
  *   POST /api/watch { importNaver: { complex, rows:[…] } }   크롬 확장이 네이버 매물 탭에서 옮겨 온 줄들
  *   POST /api/watch { remove: id }
  *   POST /api/watch { order: [id…] }                  첫 화면의 순서
+ *   POST /api/watch { collect: true }                 지금 직방에서 받아 오늘 기록에 넣는다
  *
  * 등록 · 연결 · 삭제는 카카오로 로그인한 주인만 한다 (api/_auth.js).
  */
@@ -31,7 +32,7 @@ const MAX_WATCHES = 40;
 const SLOT = /^\d{4}-\d{2}-\d{2}(T12)?$/;
 /* 예전에는 하루 두 번(…T00 · …T12) 기록했다. 00시 것은 더 보여주지 않는다 —
    db/schema.sql을 다시 실행하면 표에서도 지워진다. */
-/* 그날 수집이 아직 돌지 않아 호가가 하나도 없는 날(예: 낮 12시 전의 오늘)은 날짜째 감춘다.
+/* 그날 수집이 아직 돌지 않아 호가가 하나도 없는 날(예: 아침 수집 전의 오늘)은 날짜째 감춘다.
    수집이 돌았는데도 매물이 없던 날은 남긴다 — 화면이 "매물이 없었습니다"라고 말한다. */
 const collected = (s) => Number(s.count) > 0 || !s.sources || s.sources.zigbang === "ok";
 const current = (rows) => (rows || []).filter((s) => !/T00$/.test(s.slot) && collected(s));
@@ -43,7 +44,11 @@ const area = (v) => { const n = Number(v); return n > 0 && n < 1000 ? Math.round
 function brief(w) {
   const { deals, ...rest } = w;
   const last = (deals || []).filter((d) => !d.canceled)[0] || null;
-  return { ...rest, last_deal: last };
+  /* 최근 1년의 가장 비싼 거래 — 지금 호가와 견줄 값 */
+  const from = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+  const high = (deals || []).filter((d) => !d.canceled && d.date >= from)
+    .reduce((m, d) => (!m || d.price > m.price ? d : m), null);
+  return { ...rest, last_deal: last, high_1y: high };
 }
 
 module.exports = async function handler(req, res) {
@@ -150,6 +155,12 @@ module.exports = async function handler(req, res) {
       const existing = (await data.watches()) || [];
 
       /* 첫 화면에서 끌어 바꾼 순서. 적히지 않은 관심은 그 뒤에 원래 차례대로 선다. */
+      /* 지금 직방에서 받아 오늘 기록에 넣는다 (아침 수집과 같은 일) */
+      if (body && body.collect) {
+        const report = await run(data);
+        return lib.json(res, 200, { ok: true, ...report });
+      }
+
       if (body && Array.isArray(body.order)) {
         const want = body.order.slice(0, 200).map((id) => clean(id, 80));
         const known = want.filter((id, i) => want.indexOf(id) === i && existing.some((w) => w.id === id));

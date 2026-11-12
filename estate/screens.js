@@ -21,6 +21,26 @@ function chg(now, before){
   return '<span class="chg ' + (d > 0 ? "up" : "down") + '">' + delta(d) + '</span>';
 }
 
+/*
+ * 지금 호가가 최근 1년의 가장 비싼 실거래와 얼마나 떨어져 있는가.
+ * 호가는 직방과 네이버가 모두 들어온 가장 최근 날의 최저가로 본다 (네이버에 이어지지 않은
+ * 단지는 직방만). → { d, slot, peak } · 견줄 것이 없으면 null
+ */
+function peakGap(w, series, peak){
+  if (!peak) return null;
+  for (var i = series.length - 1; i >= 0; i--){
+    var s = series[i], src = s.sources || {};
+    if (s.min_price == null || src.zigbang !== "ok" || (w.naver_id && src.naver !== "ok")) continue;
+    return { d: s.min_price - peak.price, slot: s.slot, peak: peak };
+  }
+  return null;
+}
+/* 높으면 빨강, 낮으면 파랑 */
+function gapMark(g){
+  if (!g.d) return '<b class="chg">같음</b>';
+  return '<b class="chg ' + (g.d > 0 ? "up" : "down") + '">' + delta(g.d) + '</b>';
+}
+
 function place(address){
   return address ? '<span class="sub-place">' + icon("pin", "sub-pin") + esc(address) + '</span>' : "";
 }
@@ -62,7 +82,7 @@ export function renderList(view){
   if (!Store.watches.length){
     var blank = el('<div class="blankstate"><div class="blankstate-mark">' + icon("pin") + '</div>' +
       '<h2>관심 단지가 아직 없습니다</h2>' +
-      '<p>단지와 평형을 등록하면 매일 낮 12시에 그날의 호가 목록을 기록합니다.</p>' +
+      '<p>단지와 평형을 등록하면 매일 오전 9시 30분에 그날의 호가 목록을 기록합니다.</p>' +
       '<button class="btn btn-primary" type="button">' + icon("plus") + '관심 단지 추가</button></div>');
     ripple(blank.querySelector(".btn"), openAdd);
     pad.appendChild(blank);
@@ -90,7 +110,28 @@ export function renderList(view){
     ripple(add, openAdd);
     list.appendChild(add);
     pad.appendChild(list);
-    pad.appendChild(el('<p class="store-note">매일 낮 12시에 기록합니다</p>'));
+    pad.appendChild(el('<p class="store-note">매일 오전 9시 30분에 기록합니다</p>'));
+    if (Store.canEdit()){
+      /* 아침 수집을 기다리지 않고 지금 직방에서 받아 오늘 기록에 넣는다 */
+      var foot = el('<div class="dangerfoot"><button class="linkbtn" type="button">' + icon("clock") +
+        '지금 직방 호가 가져오기</button></div>');
+      var nowBtn = foot.querySelector("button");
+      ripple(nowBtn, function(){
+        if (nowBtn.disabled) return;
+        nowBtn.disabled = true;
+        toast("직방에서 받아오는 중…");
+        Store.post({ collect: true }).then(function(r){
+          var bad = (r.failed || []).filter(function(f){ return f.source === "직방"; });
+          if (bad.length) toast("일부를 받지 못했습니다 — " + bad[0].complex + ": " + bad[0].error, true);
+          else toastDone("오늘(" + dayShort(r.slot) + ") 기록에 " + r.saved + "개 평형의 직방 호가를 넣었습니다.");
+          nav.reload();
+        }).catch(function(e){
+          nowBtn.disabled = false;
+          toast("가져오지 못했습니다 — " + e.message, true);
+        });
+      });
+      pad.appendChild(foot);
+    }
   }
   pad.appendChild(pageFooter());
   swap(view, pad);
@@ -296,6 +337,7 @@ function watchCard(w, view){
   var last = series[series.length - 1];
   var prev = series[series.length - 2];
   var deal = w.last_deal;
+  var pg = peakGap(w, series, w.high_1y);
   var wrap = el('<div class="swipe"><div class="trip-card"><button class="trip-open" type="button">' +
     '<div class="watch-top"><div class="watch-id">' +
       '<span class="watch-name">' + esc(w.complex_name) + '</span>' + place(w.address) +
@@ -308,6 +350,8 @@ function watchCard(w, view){
     /* 호가와 실거래를 같은 크기로 나란히 — 둘을 견주는 것이 이 카드의 일이다 */
     (deal ? '<div class="watch-price deal"><span class="lbl">최근 실거래 · ' + dayShort(deal.date) + '</span>' +
       '<b>' + won(deal.price) + '</b></div>' : '') + '</div>' +
+    (pg ? '<div class="watch-gap ' + (pg.d > 0 ? "up" : pg.d < 0 ? "down" : "") + '"><span>1년 최고 실거래 ' +
+      won(pg.peak.price) + ' 대비</span>' + gapMark(pg) + '<small>' + dayShort(pg.slot) + ' 호가</small></div>' : '') +
     (last ? '<div class="watch-foot"><span>매물 <b>' + last.count + '</b>건</span>' +
       (prev ? chg(last.min_price, prev.min_price) : "") +
       sparkline(series.map(function(s){ return s.min_price; })) +
@@ -355,7 +399,7 @@ export function renderWatch(view, id, slot){
     body.innerHTML = "";
     if (!history.length){
       body.appendChild(el('<div class="card dashed"><p class="card-empty">아직 기록이 없습니다. ' +
-        '다음 낮 12시에 첫 기록이 남습니다.</p></div>'));
+        '다음 오전 9시 30분에 첫 기록이 남습니다.</p></div>'));
       body.appendChild(dealsCard(full));
       body.appendChild(removeFoot(w));
       return;
@@ -388,6 +432,9 @@ function paintWatch(body, hero, w, history, at, mine, live){
   var now = live && live !== "wait" ? live.snapshot : null;
   var snap = now || history[at], before = now ? history[history.length - 1] : history[at - 1];
   var deal = liveDeals(w)[0];
+  var yearAgo = isoDay(new Date(Date.now() - 365 * 86400000));
+  var pg = peakGap(w, history, liveDeals(w).filter(function(d){ return d.date >= yearAgo; })
+    .reduce(function(m, d){ return !m || d.price > m.price ? d : m; }, null));
   var old = hero.querySelector(".now");
   if (old) old.remove();
   var gap = "";
@@ -406,6 +453,9 @@ function paintWatch(body, hero, w, history, at, mine, live){
     '</div>' +
     (deal ? '<div class="now-deal"><span class="lbl">최근 실거래</span><b>' + won(deal.price) + '</b>' +
       '<span>' + [floorLabel(deal.floor), dayShort(deal.date)].filter(Boolean).join(" · ") + '</span>' + gap + '</div>' : '') +
+    (pg ? '<div class="now-deal peak"><span class="lbl">1년 최고 실거래</span><b>' + won(pg.peak.price) + '</b>' +
+      '<span>' + [floorLabel(pg.peak.floor), pg.peak.date.slice(2).replace(/-/g, ".")].filter(Boolean).join(" · ") + '</span>' +
+      '<span class="gap">' + dayShort(pg.slot) + ' 최저 호가 ' + gapMark(pg) + '</span></div>' : '') +
     '</div>'));
 
   body.innerHTML = "";
@@ -519,7 +569,7 @@ function askRow(l, mark, dead, w, low){
 
 /* 실거래를 볼 기간. 고른 것은 화면을 옮겨도 그대로다 */
 var PERIODS = [
-  { key: "5y", label: "전체 (5년)", said: "최근 5년", months: 60 },
+  { key: "5y", label: "최근 5년", said: "최근 5년", months: 60 },
   { key: "3y", label: "최근 3년", said: "최근 3년", months: 36 },
   { key: "1y", label: "최근 1년", said: "최근 1년", months: 12 },
   { key: "3m", label: "최근 3개월", said: "최근 3개월", months: 3 }
@@ -819,7 +869,7 @@ function openAdd(){
       if (!data){ save.disabled = false; save.textContent = "등록"; return; }
       closeOverlay();
       if (!data.added.length) toast("이미 등록된 평형입니다.");
-      else if (!data.first || !data.first.saved) toast("등록했습니다. 첫 기록은 다음 낮 12시에 남습니다.", true);
+      else if (!data.first || !data.first.saved) toast("등록했습니다. 첫 기록은 다음 오전 9시 30분에 남습니다.", true);
       else toastDone("등록하고 첫 호가를 기록했습니다.");
       nav.reload();
     }).catch(function(e){

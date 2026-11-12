@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { site: "", at: "12:10", last: null, log: [] };
+const DEFAULTS = { site: "", at: "09:40", last: null, log: [] };
 
 function say(text) { $("said").textContent = text; }
 

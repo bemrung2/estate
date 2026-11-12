@@ -10,7 +10,7 @@
  * 서버(collect/naver.js)가 한다.
  */
 const ALARM = "collect";
-const DEFAULTS = { site: "", at: "12:10", last: null, log: [] };
+const DEFAULTS = { site: "", at: "09:40", last: null, log: [] };
 
 const get = () => chrome.storage.local.get(DEFAULTS);
 const set = (v) => chrome.storage.local.set(v);
