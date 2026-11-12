@@ -21,7 +21,7 @@ const PATH = {
 const RECENT = 3;          /* 신고는 계약 뒤 30일 안에 들어온다 — 최근 석 달은 매번 다시 받는다 */
 const SPAN = 60;           /* 거슬러 5년 */
 const KEEP = 3000;
-const TOGETHER = 5;        /* 한꺼번에 보내는 요청 수 */
+const TOGETHER = 3;        /* 한꺼번에 걸어 두는 요청 수 (실제로는 한 줄로 띄워 나간다 — ask) */
 
 /* 붙여넣다 딸려 온 따옴표와 빈칸은 떼어낸다 */
 function key() { return String(process.env.MOLIT_SERVICE_KEY || "").trim().replace(/^["']+|["']+$/g, "").trim(); }
@@ -126,15 +126,42 @@ function parse(text, status) {
   throw new Error("실거래가 API: HTTP " + status);
 }
 
+/*
+ * 공공데이터포털은 초당 요청 수를 센다. 그래서 요청은 한 줄로 세워 SPACING만큼 띄워 보내고,
+ * 그래도 "초당 … 제한 … 초과"가 오면 잠깐 쉬었다가 몇 번 다시 묻는다.
+ */
+const SPACING = 220, RETRIES = 4;
+let gate = Promise.resolve();
+const rest = (ms) => new Promise((done) => setTimeout(done, ms));
+function turn() {
+  const mine = gate.then(() => rest(SPACING));
+  gate = mine.catch(() => {});
+  return mine;
+}
+const limited = (e) => /초당|제한횟수|LIMITED_NUMBER_OF_SERVICE_REQUESTS|\b22\b|HTTP 429/.test(String(e && e.message));
+
+async function ask(url) {
+  for (let n = 0; ; n++) {
+    await turn();
+    try {
+      let res;
+      try { res = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15000) }); }
+      catch (e) { throw new Error("실거래가 API에 닿지 못했습니다"); }
+      return parse(await res.text(), res.status);
+    } catch (e) {
+      if (!limited(e) || n >= RETRIES) throw e;
+      /* 뒤에 선 요청들도 함께 쉬게 줄 자체를 늦춘다 */
+      gate = gate.then(() => rest(1200 * (n + 1)));
+    }
+  }
+}
+
 async function month(trade, lawd, ym) {
   const rows = [];
   for (let page = 1; page <= 10; page++) {
     const url = BASE + PATH[trade] + "?serviceKey=" + keyParam() +
       "&LAWD_CD=" + lawd + "&DEAL_YMD=" + ym + "&numOfRows=1000&pageNo=" + page + "&_type=json";
-    let res;
-    try { res = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15000) }); }
-    catch (e) { throw new Error("실거래가 API에 닿지 못했습니다"); }
-    const got = parse(await res.text(), res.status);
+    const got = await ask(url);
     got.items.forEach((it) => rows.push(norm(it)));
     if (rows.length >= got.total || !got.items.length) break;
   }
