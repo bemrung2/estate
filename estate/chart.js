@@ -33,7 +33,7 @@ function time(iso){ return Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso
  * 그날 호가가 걸쳐 있던 폭(최저–최고)을 옅은 띠로, 최저와 중간을 선으로, 실거래를 점으로
  * 같은 눈금 위에 둔다. 가로는 날짜다 — 기록이 빠진 날은 그만큼 벌어진다.
  */
-export function flowChart(rows, deals, at, onPick){
+export function flowChart(rows, deals, at){
   var W = 360, H = 196, L = 8, R = 8, T = 16, B = 26;
   var wrap = el('<div class="chart-wrap"></div>');
   var live = rows.map(function(r, i){ return r.min == null ? null : { i: i, t: time(r.slot), r: r }; }).filter(Boolean);
@@ -54,6 +54,14 @@ export function flowChart(rows, deals, at, onPick){
   live.forEach(function(p){ lo = Math.min(lo, p.r.min); hi = Math.max(hi, p.r.max); });
   shownDeals.forEach(function(d){ lo = Math.min(lo, d.price); hi = Math.max(hi, d.price); });
   if (hi === lo){ hi += 500; lo -= 500; }
+  /* 값이 그림의 위아래 끝에 닿지 않게 숨 쉴 자리를 두고, 눈금은 읽기 좋은 값에 맞춘다 */
+  var room = (hi - lo) * 0.3;
+  var step = [500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000]
+    .filter(function(v){ return (hi - lo + room * 2) / v <= 4; })[0] || 200000;
+  lo = Math.floor((lo - room) / step) * step;
+  hi = Math.ceil((hi + room) / step) * step;
+  var ticks = [];
+  for (var v = hi; v >= lo; v -= step) ticks.push(v);
   function x(t){ return L + 6 + (W - L - R - 12) * (t - t0) / (t1 - t0); }
   function y(v){ return T + (H - T - B) * (1 - (v - lo) / (hi - lo)); }
   function line(key){
@@ -62,9 +70,9 @@ export function flowChart(rows, deals, at, onPick){
 
   var svg = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="호가 흐름: ' +
     won(lo) + '에서 ' + won(hi) + ' 사이">';
-  [hi, (hi + lo) / 2, lo].forEach(function(v, k){
-    svg += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>';
-    if (k !== 1) svg += '<text class="tick" x="' + L + '" y="' + (y(v) - 4) + '">' + won(Math.round(v)) + '</text>';
+  ticks.forEach(function(v){
+    svg += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>' +
+      '<text class="tick" x="' + L + '" y="' + (y(v) - 4) + '">' + won(v) + '</text>';
   });
   svg += '<text class="tick" x="' + L + '" y="' + (H - 7) + '">' + dayShort(new Date(t0).toISOString()) + '</text>' +
     '<text class="tick" x="' + (W - R) + '" y="' + (H - 7) + '" text-anchor="end">' + dayShort(new Date(t1).toISOString()) + '</text>' +
@@ -82,7 +90,7 @@ export function flowChart(rows, deals, at, onPick){
   shownDeals.forEach(function(d){
     svg += '<circle class="deal" cx="' + x(time(d.date)).toFixed(1) + '" cy="' + y(d.price).toFixed(1) + '" r="4"/>';
   });
-  svg += '<circle class="dot" r="4.5" hidden/></svg>';
+  svg += '<circle class="sel" r="5.5" hidden/><circle class="dot" r="4.5" hidden/></svg>';
   wrap.innerHTML = svg;
 
   var node = wrap.querySelector("svg");
@@ -127,15 +135,28 @@ export function flowChart(rows, deals, at, onPick){
     });
     return best;
   }
-  var chosen = marks.filter(function(m){ return m.row && m.row.i === at; })[0] || null;
-  function rest(){ show(chosen); }
-  wrap.addEventListener("pointermove", function(e){ show(nearest(e)); });
-  wrap.addEventListener("pointerleave", rest);
-  wrap.addEventListener("click", function(e){
-    var m = nearest(e);
-    if (m && m.row && m.row.i !== at && onPick) onPick(m.row.i);
+  /* 풍선은 누르고 있는 동안에만 뜬다 — 누른 채 옆으로 끌면 그 날을 따라간다 */
+  var held = null;
+  wrap.addEventListener("pointerdown", function(e){
+    if (e.button && e.button !== 0) return;
+    held = e.pointerId;
+    try{ wrap.setPointerCapture(held); }catch(err){ /* 이미 놓았다 */ }
+    show(nearest(e));
   });
-  requestAnimationFrame(rest);
+  wrap.addEventListener("pointermove", function(e){ if (e.pointerId === held) show(nearest(e)); });
+  function letGo(e){ if (e.pointerId === held){ held = null; show(null); } }
+  wrap.addEventListener("pointerup", letGo);
+  wrap.addEventListener("pointercancel", letGo);
+
+  /* 아래 목록이 어느 날의 것인지 — 그날의 최저가에 고리를 두른다 */
+  var sel = node.querySelector(".sel");
+  wrap.select = function(i){
+    var m = marks.filter(function(k){ return k.row && k.row.i === i; })[0];
+    if (!m) return sel.setAttribute("hidden", "");
+    sel.removeAttribute("hidden");
+    sel.setAttribute("cx", m.x); sel.setAttribute("cy", m.y);
+  };
+  wrap.select(at);
   return wrap;
 }
 

@@ -10,7 +10,9 @@ import { won, delta, slotLabel, slotShort, dayShort, clock, floorLabel, PLATFORM
 import { sparkline, flowChart, flowLegend, dealChart } from "./chart.js";
 
 var nav = { go: function(){}, set: function(){}, reload: function(){} };
-export function wire(n){ nav = n; }
+export function wire(n){
+  nav = { go: n.go, set: n.set, reload: function(){ openWatch = null; return n.reload(); } };   /* 고친 뒤에는 새로 짓는다 */
+}
 
 var TRADE = { trade: "매매", charter: "전세" };
 
@@ -389,7 +391,7 @@ function paintAt(o, slot, mine){
 export function renderWatch(view, id, slot){
   var w = Store.watch(id);
   var mine = ++shown;
-  if (openWatch && openWatch.w === w && openWatch.history && view.contains(openWatch.body)){
+  if (openWatch && openWatch.id === id && view.contains(openWatch.body)){
     return paintAt(openWatch, slot, mine);
   }
   openWatch = null;
@@ -428,7 +430,7 @@ export function renderWatch(view, id, slot){
       body.appendChild(removeFoot(w));
       return;
     }
-    openWatch = { w: w, body: body, hero: hero, full: full, history: history };
+    openWatch = { id: id, body: body, hero: hero, full: full, history: history };
     return paintAt(openWatch, slot, mine);
   }).catch(function(e){
     if (mine !== shown) return;
@@ -449,7 +451,6 @@ function paintWatch(body, hero, w, history, at, mine, live){
   var pg = peakGap(w, history, liveDeals(w).filter(function(d){ return d.date >= yearAgo; })
     .reduce(function(m, d){ return !m || d.price > m.price ? d : m; }, null));
   var old = hero.querySelector(".now");
-  if (old) old.remove();
   /* 실거래와 최저 호가를 견주는 표: 직전 거래와 1년 최고 거래, 한 줄씩 같은 모양으로 */
   var ymd = function(iso){ return iso.slice(2).replace(/-/g, "."); };
   var lines = [];
@@ -463,7 +464,7 @@ function paintWatch(body, hero, w, history, at, mine, live){
         '<span class="when">' + ymd(l.deal.date) + '</span>' +
         '<span class="gap">' + other + (l.d == null ? '<b class="chg">—</b>' : gapMark({ d: l.d })) + '</span></div>';
     }).join("") + '</div>';
-  hero.appendChild(el('<div class="now">' +
+  var fresh = el('<div class="now">' +
     '<div class="now-label">' + TRADE[w.trade] + ' 최저 호가<span class="now-when">' +
       (now ? "현재 · " + clock(now.taken_at) + " 기준" : slotLabel(snap.slot)) + '</span></div>' +
     '<div class="now-big"><b>' + won(snap.min_price) + '</b>' + (before ? chg(snap.min_price, before.min_price) : "") + '</div>' +
@@ -473,7 +474,9 @@ function paintWatch(body, hero, w, history, at, mine, live){
       '<div><span class="lbl">매물</span><b>' + snap.count + '건</b></div>' +
     '</div>' +
     cmp +
-    '</div>'));
+    '</div>');
+  /* 제자리에서 바꿔 끼운다 — 뺐다 넣으면 그 사이 화면 길이가 줄어 스크롤이 튄다 */
+  if (old) old.replaceWith(fresh); else hero.appendChild(fresh);
 
   function pick(i){
     nav.set("/w/" + encodeURIComponent(w.id) +
@@ -485,7 +488,7 @@ function paintWatch(body, hero, w, history, at, mine, live){
     '<span class="card-n">' + history.length + '일</span></h3></div></div>');
   chart.appendChild(flowChart(history.map(function(s){
     return { slot: s.slot, label: slotLabel(s.slot), min: s.min_price, med: s.med_price, max: s.max_price, count: s.count };
-  }), w.deals, live ? history.length - 1 : at, pick));
+  }), w.deals, live ? history.length - 1 : at));
   chart.appendChild(flowLegend(liveDeals(w).length > 0));
 
   var list = el('<div class="card" style="margin-top:12px"><div class="card-head"><h3>' +
@@ -525,8 +528,9 @@ function paintWatch(body, hero, w, history, at, mine, live){
     body.appendChild(removeFoot(w));
     parts = body._parts = { chart: chart, chips: chips, list: list, gone: null };
   } else {
-    parts.chart.replaceWith(chart);
-    parts.chart = chart;
+    /* 그림은 그대로 두고, 어느 날을 보는지만 옮겨 표시한다 */
+    var drawn = parts.chart.querySelector(".chart-wrap");
+    if (drawn && drawn.select) drawn.select(live ? history.length - 1 : at);
     /* 옛 목록은 새 것이 올 때까지 흐리게 남겨 둔다 — 화면이 줄었다 늘며 튀지 않게 */
     if (live === "wait") showList(null); else parts.list.classList.add("stale");
   }
