@@ -101,8 +101,15 @@ async function ensure(data, group) {
   }
   const noPlace = group.some((w) => !w.lawd_cd), noHgnn = group.some((w) => !w.hgnn_id);
   const noNaver = group.some((w) => !w.naver_id);
-  if (noPlace || noHgnn || noNaver) {
+  /* 직방이 면적을 주지 않은 평형(지금 매물이 없는 것) — KB의 평형 정보로 채운다 */
+  const noArea = group.filter((w) => !Number(w.exclusive_m2) && !(patches[w.id] && patches[w.id].exclusive_m2));
+  if (noPlace || noHgnn || noNaver || noArea.length) {
     const { bcode, lat, lng, ...where } = await zigbang.place(head.complex_id);
+    if (noArea.length) {
+      const rows = noArea.map((w) => ({ id: w.id, supply: Number(w.supply_m2) || parseFloat(w.room_label) || 0, exclusive: 0 }));
+      await kb.fillAreas(rows, { bcode, lat, lng, name: head.complex_name });
+      rows.forEach((r) => { if (r.exclusive) note(r.id, { supply_m2: r.supply, exclusive_m2: r.exclusive }); });
+    }
     if (noNaver) {
       /* 네이버 부동산의 그 단지 — KB가 단지마다 네이버 단지 코드를 알려준다 */
       let nid = "";

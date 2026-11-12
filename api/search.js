@@ -32,7 +32,15 @@ module.exports = async function handler(req, res) {
     const complex = url.searchParams.get("complex");
     if (complex) {
       if (!/^\d{1,12}$/.test(complex)) return lib.json(res, 400, { ok: false, error: "complex" });
-      return lib.json(res, 200, { ok: true, types: await zigbang.roomTypes(complex) });
+      const types = await zigbang.roomTypes(complex);
+      /* 직방이 면적을 주지 않은 평형(지금 매물이 없는 것)은 KB의 것으로 채운다 */
+      if (types.some((t) => !t.exclusive)) {
+        try {
+          const where = await zigbang.place(complex);
+          await kb.fillAreas(types, { ...where, name: (url.searchParams.get("name") || "").trim().slice(0, 60) });
+        } catch (e) { /* 못 채우면 모르는 채로 둔다 */ }
+      }
+      return lib.json(res, 200, { ok: true, types });
     }
 
     const q = (url.searchParams.get("q") || "").trim().slice(0, 40);

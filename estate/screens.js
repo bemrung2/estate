@@ -179,14 +179,18 @@ export function renderList(view){
       ripple(nowBtn, function(){
         if (nowBtn.disabled) return;
         nowBtn.disabled = true;
-        toast("직방에서 받아오는 중…");
+        /* 끝날 때까지 단추가 돌고 있다 — 단지가 많으면 수십 초 걸린다 */
+        var idle = nowBtn.innerHTML;
+        nowBtn.classList.add("busy");
+        nowBtn.innerHTML = '<i class="spin"></i>직방에서 가져오는 중…';
+        var done = function(){ nowBtn.classList.remove("busy"); nowBtn.innerHTML = idle; nowBtn.disabled = false; };
         Store.post({ collect: true }).then(function(r){
           var bad = (r.failed || []).filter(function(f){ return f.source === "직방"; });
           if (bad.length) toast("일부를 받지 못했습니다 — " + bad[0].complex + ": " + bad[0].error, true);
           else toastDone("오늘(" + dayShort(r.slot) + ") 기록에 " + r.saved + "개 평형의 직방 호가를 넣었습니다.");
           nav.reload();
         }).catch(function(e){
-          nowBtn.disabled = false;
+          done();
           toast("가져오지 못했습니다 — " + e.message, true);
         });
       });
@@ -964,7 +968,7 @@ function openAdd(){
 
     foot.hidden = false;
     var asking = ++asked;
-    Store.types(chosen.id).then(function(data){
+    Store.types(chosen.id, chosen.name).then(function(data){
       if (asking !== asked || !data) return;
       types = data.types;
       paintTypes();

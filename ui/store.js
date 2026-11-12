@@ -105,7 +105,9 @@ export var Store = {
   snapshot(id, slot){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=" + encodeURIComponent(slot)); },
   live(id){ return ask("api/watch?id=" + encodeURIComponent(id) + "&slot=now"); },
   search(q){ return ask("api/search?q=" + encodeURIComponent(q)); },
-  types(complexId){ return ask("api/search?complex=" + encodeURIComponent(complexId)); },
+  types(complexId, name){
+    return ask("api/search?complex=" + encodeURIComponent(complexId) + "&name=" + encodeURIComponent(name || ""));
+  },
   findNaver(complexId, name){
     return ask("api/search?naverOf=" + encodeURIComponent(complexId) + "&name=" + encodeURIComponent(name));
   },
