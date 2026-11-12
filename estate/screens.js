@@ -911,16 +911,25 @@ function openAdd(){
         else groups.push(open = [t]);
       });
     types.forEach(function(t){ if (!t.exclusive) groups.push([t]); });
+    /* 묶은 뒤에도 원래 차례(작은 평형부터)로 — 묶음은 그 안의 가장 작은 평형 자리에 선다 */
+    groups.forEach(function(g){ g.sort(function(a, b){ return types.indexOf(a) - types.indexOf(b); }); });
+    groups.sort(function(a, b){ return types.indexOf(a[0]) - types.indexOf(b[0]); });
+    var span = function(list){
+      var lo = Math.min.apply(null, list), hi = Math.max.apply(null, list);
+      return lo === hi ? String(lo) : lo + "~" + hi;
+    };
     return groups.map(function(g){
       var first = g[0];
       if (g.length < 2) return { key: first.id, label: first.label, count: first.count, id: first.id, supply: first.supply, exclusive: first.exclusive };
+      /* 이름은 다른 평형들과 같은 꼴로: "61~62㎡ · 18~19평" */
       var py = g.map(function(t){ return Number((String(t.label).match(/(\d+)[A-Za-z0-9]*평/) || [])[1]) || 0; }).filter(Boolean);
-      var lo = Math.min.apply(null, py), hi = Math.max.apply(null, py);
+      var m2 = g.map(function(t){ return Math.floor(t.supply) || Number((String(t.label).match(/^(\d+)/) || [])[1]) || 0; }).filter(Boolean);
       var count = {};
       g.forEach(function(t){ Object.keys(t.count || {}).forEach(function(k){ count[k] = (count[k] || 0) + t.count[k]; }); });
       return {
         key: g.map(function(t){ return t.id; }).join("_"), count: count, n: g.length,
-        label: (py.length ? (lo === hi ? lo : lo + "~" + hi) + "평 · " : "") + "전용 " + Math.floor(first.exclusive) + "㎡",
+        label: [m2.length ? span(m2) + "㎡" : "", py.length ? span(py) + "평" : ""].filter(Boolean).join(" · ") ||
+          "전용 " + Math.floor(first.exclusive) + "㎡",
         id: first.id, supply: first.supply, exclusive: first.exclusive,
         members: g.map(function(t){ return { id: t.id, supply: t.supply, exclusive: t.exclusive }; })
       };
