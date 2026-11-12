@@ -21,6 +21,53 @@ export function sparkline(values){
     '<circle cx="' + end[0].toFixed(1) + '" cy="' + end[1].toFixed(1) + '" r="3.5"/></svg>';
 }
 
+/*
+ * 그림 위를 누른 채 끌며 읽기. at(e)는 손가락이 있는 자리로, at(null)은 손을 뗐을 때 불린다.
+ *
+ * 손가락으로는: 옆으로 끌기 시작하거나 잠깐 누르고 있으면 그림이 손가락을 잡는다 — 그때부터는
+ * 화면이 따라 구르지 않는다. 처음부터 위아래로 움직이면 평소처럼 화면이 구른다.
+ */
+function scrub(wrap, at){
+  var held = null;                    /* 마우스 */
+  wrap.addEventListener("pointerdown", function(e){
+    if (e.pointerType === "touch" || (e.button && e.button !== 0)) return;
+    held = e.pointerId;
+    try{ wrap.setPointerCapture(held); }catch(err){ /* 이미 놓았다 */ }
+    e.preventDefault();               /* 글자가 긁히지 않게 */
+    at(e);
+  });
+  wrap.addEventListener("pointermove", function(e){ if (e.pointerId === held) at(e); });
+  function letGo(e){ if (e.pointerId === held){ held = null; at(null); } }
+  wrap.addEventListener("pointerup", letGo);
+  wrap.addEventListener("pointercancel", letGo);
+
+  var x0 = 0, y0 = 0, mine = false, gone = false, timer = null, last = null;
+  function end(){ clearTimeout(timer); timer = null; if (mine) at(null); mine = false; }
+  wrap.addEventListener("touchstart", function(e){
+    if (e.touches.length !== 1) return end();
+    var t = e.touches[0];
+    x0 = t.clientX; y0 = t.clientY; mine = false; gone = false; last = t;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ if (!gone){ mine = true; at(last); } }, 160);
+  }, { passive: true });
+  wrap.addEventListener("touchmove", function(e){
+    var t = e.touches[0];
+    last = t;
+    if (!mine && !gone){
+      var dx = Math.abs(t.clientX - x0), dy = Math.abs(t.clientY - y0);
+      if (dx < 6 && dy < 6) return;
+      if (dx >= dy) mine = true; else { gone = true; clearTimeout(timer); }      /* 위아래면 화면에 맡긴다 */
+    }
+    if (!mine) return;
+    if (e.cancelable) e.preventDefault();
+    at(t);
+  }, { passive: false });
+  wrap.addEventListener("touchend", end);
+  wrap.addEventListener("touchcancel", end);
+  wrap.addEventListener("contextmenu", function(e){ if (mine) e.preventDefault(); });
+  wrap.addEventListener("selectstart", function(e){ e.preventDefault(); });
+}
+
 /* ---------- 호가 흐름 ---------- */
 var DAY = 86400000;
 function time(iso){ return Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)); }
@@ -135,18 +182,7 @@ export function flowChart(rows, deals, at){
     });
     return best;
   }
-  /* 풍선은 누르고 있는 동안에만 뜬다 — 누른 채 옆으로 끌면 그 날을 따라간다 */
-  var held = null;
-  wrap.addEventListener("pointerdown", function(e){
-    if (e.button && e.button !== 0) return;
-    held = e.pointerId;
-    try{ wrap.setPointerCapture(held); }catch(err){ /* 이미 놓았다 */ }
-    show(nearest(e));
-  });
-  wrap.addEventListener("pointermove", function(e){ if (e.pointerId === held) show(nearest(e)); });
-  function letGo(e){ if (e.pointerId === held){ held = null; show(null); } }
-  wrap.addEventListener("pointerup", letGo);
-  wrap.addEventListener("pointercancel", letGo);
+  scrub(wrap, function(e){ show(e ? nearest(e) : null); });
 
   /* 아래 목록이 어느 날의 것인지 — 그날의 최저가에 고리를 두른다 */
   var sel = node.querySelector(".sel");
@@ -231,7 +267,8 @@ export function dealChart(deals, from, to){
     tip.style.left = Math.max(0, Math.min(box.width - tip.offsetWidth, px - tip.offsetWidth / 2)) + "px";
     tip.style.top = (m.y / H * box.height > box.height / 2 ? 0 : box.height - tip.offsetHeight - 30) + "px";
   }
-  wrap.addEventListener("pointermove", function(e){
+  scrub(wrap, function(e){
+    if (!e) return show(null);
     var box = wrap.getBoundingClientRect();
     var px = (e.clientX - box.left) / box.width * W, py = (e.clientY - box.top) / box.height * H;
     var best = null, far = Infinity;
@@ -241,6 +278,5 @@ export function dealChart(deals, from, to){
     });
     show(best);
   });
-  wrap.addEventListener("pointerleave", function(){ show(null); });
   return wrap;
 }

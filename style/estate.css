@@ -427,3 +427,6 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 /* 단지 화면: 호갱노노는 이름 옆에 작게 */
 .hero-top > .outlink{ flex-shrink: 0; margin-left: auto; align-self: center; font-size: 10.5px; padding: 2px 6px 2px 7px; }
 .hero-top > .outlink .icon{ width: 10px; height: 10px; }
+/* 그림 위를 끌 때 글자가 긁히거나 길게 누른 메뉴가 뜨지 않게 */
+.chart-wrap, .chart-wrap *{ -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.chart-wrap{ -webkit-tap-highlight-color: transparent; }
