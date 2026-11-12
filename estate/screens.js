@@ -525,7 +525,7 @@ var PERIODS = [
   { key: "3m", label: "최근 3개월", said: "최근 3개월", months: 3 }
 ];
 var period = "5y";
-var LIST_FIRST = 15;
+var LIST_FIRST = 10;
 
 function since(months){
   var to = new Date();
@@ -587,11 +587,20 @@ function dealsCard(w){
       (inRange.length > live.length ? ' · 해제 ' + (inRange.length - live.length) + '건 포함' : '') + '</p>'));
     /* 달마다 묶어서 — 언제 얼마나 거래됐는지가 먼저 보이게 */
     var floorPrice = live.length > 1 ? Math.min.apply(null, live.map(function(d){ return d.price; })) : null;
+    var topPrice = live.length > 1 ? Math.max.apply(null, live.map(function(d){ return d.price; })) : null;
+    if (topPrice === floorPrice) topPrice = null;          /* 모두 같은 값이면 최고라 부를 것이 없다 */
     var isLow = function(d){ return !d.canceled && d.price === floorPrice; };
-    /* 기간 최저가 접힌 곳에 있으면 거기까지는 펴서 보여준다 */
-    var lastLow = -1;
-    inRange.forEach(function(d, i){ if (isLow(d)) lastLow = i; });
-    var first = Math.max(LIST_FIRST, lastLow + 1);
+    var isHigh = function(d){ return !d.canceled && d.price === topPrice; };
+    /* 기간의 최고 · 최저는 목록 맨 위에 따로 꺼내 둔다 — 접힌 곳에 있어도 보이게 */
+    var first = LIST_FIRST;
+    [[isHigh, "최고", " high"], [isLow, "최저", ""]].forEach(function(k){
+      var d = live.filter(k[0])[0];
+      if (!d) return;
+      body.appendChild(el('<div class="deal-row low pinned' + k[2] + '"><b>' + won(d.price) + '</b>' +
+        '<i class="lowtag">' + p.said + ' ' + k[1] + '</i>' +
+        '<span>' + esc(floorLabel(d.floor) || "층 미상") + '</span>' +
+        '<span class="when">' + d.date.slice(2).replace(/-/g, ".") + '</span></div>'));
+    });
     var shownRows = more ? inRange : inRange.slice(0, first);
     var month = "";
     shownRows.forEach(function(d){
@@ -601,8 +610,8 @@ function dealsCard(w){
         var n = inRange.filter(function(x){ return x.date.slice(0, 7) === m; }).length;
         body.appendChild(el('<div class="deal-month">' + m.replace("-", ".") + '<span>' + n + '건</span></div>'));
       }
-      body.appendChild(el('<div class="deal-row' + (d.canceled ? " off" : "") + (isLow(d) ? " low" : "") + '"><b>' + won(d.price) + '</b>' +
-        (isLow(d) ? '<i class="lowtag">' + p.said + ' 최저</i>' : '') +
+      body.appendChild(el('<div class="deal-row' + (d.canceled ? " off" : "") + (isLow(d) ? " low" : isHigh(d) ? " low high" : "") + '"><b>' + won(d.price) + '</b>' +
+        (isLow(d) ? '<i class="lowtag">' + p.said + ' 최저</i>' : isHigh(d) ? '<i class="lowtag">' + p.said + ' 최고</i>' : '') +
         '<span>' + esc(floorLabel(d.floor) || "층 미상") + (d.canceled ? " · 해제" : "") + '</span>' +
         '<span class="when">' + Number(d.date.slice(8, 10)) + '일</span></div>'));
     });
