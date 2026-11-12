@@ -437,11 +437,19 @@ function paintWatch(body, hero, w, history, at, mine, live){
     .reduce(function(m, d){ return !m || d.price > m.price ? d : m; }, null));
   var old = hero.querySelector(".now");
   if (old) old.remove();
-  var gap = "";
-  if (deal && snap.min_price != null){
-    var d = snap.min_price - deal.price;
-    gap = '<span class="gap">' + (now ? "현재" : dayShort(snap.slot)) + ' 최저 호가 ' + gapMark({ d: d }) + '</span>';
-  }
+  /* 실거래와 최저 호가를 견주는 표: 직전 거래와 1년 최고 거래, 한 줄씩 같은 모양으로 */
+  var ymd = function(iso){ return iso.slice(2).replace(/-/g, "."); };
+  var lines = [];
+  if (deal) lines.push({ label: "직전", deal: deal, d: snap.min_price != null ? snap.min_price - deal.price : null, slot: snap.slot });
+  if (pg) lines.push({ label: "1년 최고", deal: pg.peak, d: pg.d, slot: pg.slot });
+  var cmp = !lines.length ? "" : '<div class="cmp"><div class="cmp-head"><span>실거래</span><span>최저 호가 대비</span></div>' +
+    lines.map(function(l){
+      /* 견준 호가가 지금 보는 날의 것이 아니면 그 날짜를 작게 적는다 */
+      var other = l.slot !== snap.slot ? '<small>' + dayShort(l.slot) + '</small>' : '';
+      return '<div class="cmp-row"><span class="lbl">' + l.label + '</span><b>' + won(l.deal.price) + '</b>' +
+        '<span class="when">' + ymd(l.deal.date) + '</span>' +
+        '<span class="gap">' + other + (l.d == null ? '<b class="chg">—</b>' : gapMark({ d: l.d })) + '</span></div>';
+    }).join("") + '</div>';
   hero.appendChild(el('<div class="now">' +
     '<div class="now-label">' + TRADE[w.trade] + ' 최저 호가<span class="now-when">' +
       (now ? "현재 · " + clock(now.taken_at) + " 기준" : slotLabel(snap.slot)) + '</span></div>' +
@@ -451,11 +459,7 @@ function paintWatch(body, hero, w, history, at, mine, live){
       '<div><span class="lbl">최고</span><b>' + won(snap.max_price) + '</b></div>' +
       '<div><span class="lbl">매물</span><b>' + snap.count + '건</b></div>' +
     '</div>' +
-    (deal ? '<div class="now-deal"><span class="lbl">직전 실거래</span><b>' + won(deal.price) + '</b>' +
-      '<span>' + [floorLabel(deal.floor), dayShort(deal.date)].filter(Boolean).join(" · ") + '</span>' + gap + '</div>' : '') +
-    (pg ? '<div class="now-deal peak"><span class="lbl">1년 최고 실거래</span><b>' + won(pg.peak.price) + '</b>' +
-      '<span>' + [floorLabel(pg.peak.floor), pg.peak.date.slice(2).replace(/-/g, ".")].filter(Boolean).join(" · ") + '</span>' +
-      '<span class="gap">' + dayShort(pg.slot) + ' 최저 호가 ' + gapMark(pg) + '</span></div>' : '') +
+    cmp +
     '</div>'));
 
   body.innerHTML = "";
