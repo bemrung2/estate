@@ -123,7 +123,7 @@ async function whyNot(site) {
   const reached = await fetch(site + "/api/watch", { mode: "no-cors", cache: "no-store" }).then(() => true, () => false);
   if (!reached) return "이 컴퓨터에서 " + u.hostname + "에 연결이 되지 않습니다 (확장 " + v + ", 권한 " + (allowed ? "있음" : "없음") + ").";
   return "서버에는 닿지만 답을 읽을 수 없습니다 (확장 " + v + ", 권한 " + (allowed ? "있음" : "없음") +
-    "). chrome://extensions 에서 이 확장을 '삭제'한 뒤 extension 폴더를 다시 불러와 주세요.";
+    "). 주소가 https://로 시작하는지 확인하고, 그래도 같으면 BEMESTATE가 최신으로 배포됐는지 봐 주세요.";
 }
 
 /* BEMESTATE에 묻는다. 닿지 못하면 왜인지 알 수 있는 말로 던진다. */
@@ -149,7 +149,9 @@ let running = false;
 async function collect() {
   if (running) return;
   running = true;
-  const { site } = await get();
+  let { site } = await get();
+  /* 예전에 http로 저장해 둔 주소는 https로 고쳐 쓴다 (http는 서버가 돌려보내 기록이 막힌다) */
+  if (/^http:\/\/(?!localhost|127\.0\.0\.1)/.test(site)) { site = site.replace(/^http:/, "https:"); await set({ site }); }
   const log = [];
   try {
     if (!site) throw new Error("BEMESTATE 주소를 먼저 넣어 주세요.");

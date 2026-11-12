@@ -21,6 +21,8 @@ async function paint() {
 function origin(text) {
   try {
     const u = new URL(/^https?:\/\//.test(text.trim()) ? text.trim() : "https://" + text.trim());
+    /* http로 적으면 서버가 https로 돌려보내는데, 그 길로는 기록을 보낼 수 없다 — 늘 https로 */
+    if (u.protocol === "http:" && !/^(localhost|127\.0\.0\.1)$/.test(u.hostname)) u.protocol = "https:";
     return u.origin;
   } catch (e) { return ""; }
 }
