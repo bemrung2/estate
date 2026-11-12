@@ -10,6 +10,7 @@ import { Store } from "./ui/store.js";
 import { Theme } from "./ui/theme.js";
 import { Router } from "./ui/router.js";
 import { renderList, renderWatch, wire } from "./estate/screens.js";
+import { openLoginDialog } from "./ui/sheet.js";
 
 var view = null;
 var wasOn = "";
@@ -44,6 +45,7 @@ function route(path, segs){
 
 (async function start(){
   Theme.apply();
+  Store.onDeny = openLoginDialog;
   view = document.getElementById("view");
   wire({
     go: function(p){ Router.go(p); },

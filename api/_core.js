@@ -2,8 +2,8 @@
  * The server side's few shared pieces: the settings, the answer shape, and
  * how to reach the database. No dependencies: the repo stays build-free.
  *
- * There is no sign-in. Anyone who has the address can look, and can add or
- * remove a watch.
+ * Anyone who has the address can look. Changing things takes the owner's
+ * 카카오 sign-in (api/_auth.js).
  */
 
 function env() {

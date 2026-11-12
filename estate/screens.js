@@ -4,7 +4,7 @@ import { el, esc, icon, ripple, toast, toastDone, toastUndo } from "../ui/dom.js
 import { Store } from "../ui/store.js";
 import { themeButton } from "../ui/theme.js";
 import { brandMark, pageFooter } from "../ui/shell.js";
-import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag, openTextDialog } from "../ui/sheet.js";
+import { sheetShell, showOverlay, closeOverlay, askThenDelete, pickGroup, flag, openTextDialog, openLoginDialog } from "../ui/sheet.js";
 import { won, delta, slotLabel, slotShort, dayShort, clock, floorLabel, PLATFORM,
          listingUrl, hogangnonoUrl, naverComplexUrl, naverSearchUrl } from "./format.js";
 import { sparkline, flowChart, flowLegend, dealChart } from "./chart.js";
@@ -39,6 +39,13 @@ export function renderList(view){
       (dense() ? "카드로 보기" : "간단히 보기") + '">' + icon(dense() ? "cards" : "rows") + '</button>');
     ripple(mode, function(){ setDense(!dense()); renderList(view); });
     head.appendChild(mode);
+  }
+  if (Store.state === "ok" && Store.auth){
+    /* 주인이 로그인했으면 나가는 단추, 아니면 들어오는 단추 */
+    var sign = el('<button class="icon-btn" type="button" aria-label="' + (Store.me ? "로그아웃" : "카카오 로그인") + '">' +
+      icon(Store.me ? "logout" : "login") + '</button>');
+    ripple(sign, function(){ if (Store.me) location.href = "api/auth?logout"; else openLoginDialog(); });
+    head.appendChild(sign);
   }
   head.appendChild(themeButton(function(){ renderList(view); }));
   pad.appendChild(head);
@@ -110,6 +117,7 @@ function removeWatch(w, repaint){
 var OPEN_X = 80;
 var opened = null;         /* 지금 열려 있는 것 하나. 다른 데를 건드리면 닫힌다 */
 function swipeToDelete(wrap, slide, w, view){
+  if (!Store.canEdit()) return;          /* 못 고치는 사람에게는 밀어도 나올 것이 없다 */
   var act = el('<button class="swipe-del" type="button" aria-label="' + esc(w.complex_name + " " + w.room_label) +
     ' 삭제" tabindex="-1"><i>' + icon("trash") + '</i><span>삭제</span></button>');
   wrap.insertBefore(act, wrap.firstChild);
@@ -360,6 +368,9 @@ function paintWatch(body, hero, w, history, at, mine, live){
 
     if (!rows.length) list.appendChild(el('<p class="card-empty">' +
       (now ? "지금은 올라온 매물이 없습니다." : "이날은 올라온 매물이 없었습니다.") + '</p>'));
+    /* 그날 가장 낮은 호가 — 같은 값이 여럿이면 모두 */
+    var low = rows.reduce(function(m, l){ return l.price > 0 && (m == null || l.price < m) ? l.price : m; }, null);
+    var many = rows.length > 1;
     rows.forEach(function(l){
       var mark = "", o = wasBy[key(l)];
       if (was && hadSrc[l.src || "zigbang"]){
@@ -367,7 +378,7 @@ function paintWatch(body, hero, w, history, at, mine, live){
         else if (o.price !== l.price) mark = '<span class="chg ' + (l.price > o.price ? "up" : "down") + '">' +
           delta(l.price - o.price) + '</span>';
       }
-      list.appendChild(askRow(l, mark, false, w));
+      list.appendChild(askRow(l, mark, false, w, many && l.price === low));
     });
 
     var sources = (data.snapshot && data.snapshot.sources) || {};
@@ -395,18 +406,18 @@ function paintWatch(body, hero, w, history, at, mine, live){
 
 /* 매물 한 줄. 누르면 그 매물을 올린 곳의 화면이 새 창으로 열린다 —
    빠진 매물은 갈 곳이 없으니 줄만 남는다. */
-function askRow(l, mark, dead, w){
+function askRow(l, mark, dead, w, low){
   var src = l.src || "zigbang";
   var where = [l.dong, floorLabel(l.floor)].filter(Boolean).join(" · ");
   var url = dead ? "" : listingUrl(l, w);
-  var inner = '<span class="ask-price">' + won(l.price) + '</span>' +
+  var inner = '<span class="ask-price">' + won(l.price) + (low ? '<i class="lowtag">최저</i>' : '') + '</span>' +
     '<span class="ask-body"><b>' + esc(where || "동 · 층 미상") +
       '<span class="badge src ' + src + '">' + esc(PLATFORM[src] || src) + '</span></b>' +
       (l.title ? '<small>' + esc(l.title) + '</small>' : '') + '</span>' +
     '<span class="ask-mark">' + mark +
       (l.n > 1 ? '<span class="badge">중개 ' + l.n + '곳</span>' : '') + '</span>';
   return el(url
-    ? '<a class="askrow" href="' + esc(url) + '" target="_blank" rel="noopener">' + inner + '</a>'
+    ? '<a class="askrow' + (low ? " low" : "") + '" href="' + esc(url) + '" target="_blank" rel="noopener">' + inner + '</a>'
     : '<div class="askrow">' + inner + '</div>');
 }
 
@@ -479,7 +490,13 @@ function dealsCard(w){
       (inRange.length < all.length ? ' · 전체 ' + all.length + '건 중' : '') +
       (inRange.length > live.length ? ' · 해제 ' + (inRange.length - live.length) + '건 포함' : '') + '</p>'));
     /* 달마다 묶어서 — 언제 얼마나 거래됐는지가 먼저 보이게 */
-    var shownRows = more ? inRange : inRange.slice(0, LIST_FIRST);
+    var floorPrice = live.length > 1 ? Math.min.apply(null, live.map(function(d){ return d.price; })) : null;
+    var isLow = function(d){ return !d.canceled && d.price === floorPrice; };
+    /* 기간 최저가 접힌 곳에 있으면 거기까지는 펴서 보여준다 */
+    var lastLow = -1;
+    inRange.forEach(function(d, i){ if (isLow(d)) lastLow = i; });
+    var first = Math.max(LIST_FIRST, lastLow + 1);
+    var shownRows = more ? inRange : inRange.slice(0, first);
     var month = "";
     shownRows.forEach(function(d){
       var m = d.date.slice(0, 7);
@@ -488,13 +505,14 @@ function dealsCard(w){
         var n = inRange.filter(function(x){ return x.date.slice(0, 7) === m; }).length;
         body.appendChild(el('<div class="deal-month">' + m.replace("-", ".") + '<span>' + n + '건</span></div>'));
       }
-      body.appendChild(el('<div class="deal-row' + (d.canceled ? " off" : "") + '"><b>' + won(d.price) + '</b>' +
+      body.appendChild(el('<div class="deal-row' + (d.canceled ? " off" : "") + (isLow(d) ? " low" : "") + '"><b>' + won(d.price) + '</b>' +
+        (isLow(d) ? '<i class="lowtag">' + p.said + ' 최저</i>' : '') +
         '<span>' + esc(floorLabel(d.floor) || "층 미상") + (d.canceled ? " · 해제" : "") + '</span>' +
         '<span class="when">' + Number(d.date.slice(8, 10)) + '일</span></div>'));
     });
-    if (!more && inRange.length > LIST_FIRST){
-      var b = el('<button class="btn btn-quiet deal-more" type="button">' + inRange.length + '건 중 ' + LIST_FIRST +
-        '건을 보는 중 · 나머지 ' + (inRange.length - LIST_FIRST) + '건 모두 보기</button>');
+    if (!more && inRange.length > first){
+      var b = el('<button class="btn btn-quiet deal-more" type="button">' + inRange.length + '건 중 ' + first +
+        '건을 보는 중 · 나머지 ' + (inRange.length - first) + '건 모두 보기</button>');
       ripple(b, function(){ paint(true); });
       body.appendChild(b);
     }
@@ -510,6 +528,7 @@ function dealsCard(w){
 
 function removeFoot(w){
   var foot = el('<div class="dangerfoot"></div>');
+  if (!Store.canEdit()) return foot;
   if (w.naver_id){
     var relink = el('<button class="linkbtn" type="button">' + icon("link") + '네이버 연결 바꾸기</button>');
     ripple(relink, function(){ openNaverLink(w); });
@@ -530,6 +549,7 @@ function removeFoot(w){
 
 /* 네이버 부동산의 그 단지를 잇는다. 같은 단지의 다른 평형에도 함께 걸린다. */
 function openNaverLink(w){
+  if (!Store.canEdit()) return Store.deny();
   openTextDialog({
     title: "네이버 부동산 연결",
     value: w.naver_id ? naverComplexUrl(w.naver_id) : "",
@@ -554,6 +574,7 @@ function openNaverLink(w){
 
 /* ---------- adding a watch ---------- */
 function openAdd(){
+  if (!Store.canEdit()) return Store.deny();
   var sheet = sheetShell("관심 단지 추가");
   var body = sheet.querySelector(".sheet-body");
   var foot = sheet.querySelector(".sheet-foot");

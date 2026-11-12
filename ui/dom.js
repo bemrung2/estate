@@ -43,6 +43,7 @@ export var ICONS = {
   image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-5.5 5.5L8 14l-5 5"/>',
   bag: '<path d="M7 8h10l1 12H6L7 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
   star: '<polygon points="12 3.6 14.6 9.2 20.6 10 16.2 14.2 17.4 20.2 12 17.3 6.6 20.2 7.8 14.2 3.4 10 9.4 9.2"/>',
+  login: '<path d="M10 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-2"/><polyline points="11 9 14 12 11 15"/><line x1="14" y1="12" x2="4" y2="12"/>',
   logout: '<path d="M14 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><polyline points="17 9 20 12 17 15"/><line x1="20" y1="12" x2="10" y2="12"/>',
   people: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 5.6a3.2 3.2 0 0 1 0 4.8"/><path d="M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/>'
 };

@@ -118,8 +118,22 @@ node dev.js
    | `SUPABASE_SERVICE_ROLE_KEY` | 같은 화면의 `service_role` 키 (`anon` 키가 아니다) |
    | `CRON_SECRET` | 아무 긴 임의 문자열 (`openssl rand -base64 32`). 없으면 12시 수집이 돌지 않는다 |
    | `MOLIT_SERVICE_KEY` | (선택) 공공데이터포털 인증키. 실거래가를 켠다 |
+   | `KAKAO_REST_KEY` | 카카오 개발자 콘솔의 REST API 키. **없으면 편집이 잠기지 않는다** |
+   | `KAKAO_OWNER_ID` | 편집할 수 있는 카카오 계정의 회원번호 (처음 로그인하면 화면이 알려준다) |
+   | `KAKAO_CLIENT_SECRET` | (선택) 콘솔에서 Client Secret을 켰을 때만 |
 
    넣은 뒤 다시 배포해야 적용된다.
-3. 로그인은 없다. **주소를 아는 사람은 누구나 관심 단지를 등록 · 해제할 수 있다.**
+3. 보는 것은 주소를 아는 누구나 한다. **등록 · 수정 · 삭제는 카카오로 로그인한 주인 한 사람만** 한다 (아래).
+   크롬 확장이 네이버 매물을 넣는 일(`importNaver`)은 로그인 없이 받는다.
 4. 수집 시각은 `vercel.json`의 `crons` — UTC 03시 = 한국 낮 12시.
    Hobby 요금제는 정각에서 최대 한 시간까지 늦게 돌 수 있다.
+
+## 카카오 로그인 (편집 잠금)
+
+1. [카카오 개발자 콘솔](https://developers.kakao.com)에서 앱을 만들고 **카카오 로그인**을 켠다.
+2. Redirect URI에 `https://<내 주소>/api/auth`를 등록한다.
+3. 앱 키의 **REST API 키**를 Vercel 환경변수 `KAKAO_REST_KEY`에 넣고 다시 배포한다. 이때부터 편집이 잠긴다.
+4. 첫 화면 오른쪽 위의 로그인 단추로 카카오 로그인을 하면, 화면이 그 계정의 **회원번호**를 알려준다.
+   그 번호를 `KAKAO_OWNER_ID`에 넣고 다시 배포한다. 이제 그 계정만 편집할 수 있다.
+
+로그인하면 서명한 쿠키(30일)를 받는다. 서명 열쇠는 `SESSION_SECRET`, 없으면 `CRON_SECRET`이다.

@@ -14,6 +14,8 @@
  *   POST /api/watch { link: { complexId, naver } }    네이버 단지를 잇거나("" 이면) 끊는다
  *   POST /api/watch { importNaver: { complex, rows:[…] } }   크롬 확장이 네이버 매물 탭에서 옮겨 온 줄들
  *   POST /api/watch { remove: id }
+ *
+ * 등록 · 연결 · 삭제는 카카오로 로그인한 주인만 한다 (api/_auth.js).
  */
 const lib = require("./_core.js");
 const { open } = require("./_data.js");
@@ -21,6 +23,7 @@ const { run, peek, ensure, refreshDeals, importNaver } = require("../collect/run
 const zigbang = require("../collect/zigbang.js");
 const naver = require("../collect/naver.js");
 const molit = require("../collect/molit.js");
+const auth = require("./_auth.js");
 
 const PER_WATCH = 30;      /* a month of days on the list screen */
 const MAX_WATCHES = 40;
@@ -67,7 +70,7 @@ module.exports = async function handler(req, res) {
           const list = (series[s.watch_id] = series[s.watch_id] || []);
           if (list.length < PER_WATCH) list.unshift(s);
         });
-        return lib.json(res, 200, { ok: true, deals: molit.enabled(), watches: (watches || []).map(brief), series });
+        return lib.json(res, 200, { ok: true, deals: molit.enabled(), auth: auth.enabled(), me: auth.mayEdit(req), watches: (watches || []).map(brief), series });
       }
 
       const slot = url.searchParams.get("slot");
@@ -119,6 +122,10 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "POST") {
       const body = await lib.readBody(req, 400000);
+      /* 고치는 일(등록 · 연결 · 삭제)은 주인만. 크롬 확장이 네이버 매물을 넣는 일은 로그인 없이 받는다. */
+      if (!(body && body.importNaver) && !auth.mayEdit(req)) {
+        return lib.json(res, 401, { ok: false, error: "auth", message: "카카오 로그인이 필요합니다." });
+      }
 
       if (body && body.remove) {
         await data.removeWatch(clean(body.remove, 80));

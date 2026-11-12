@@ -82,6 +82,20 @@ function growAll(root){
 }
 
 /* 지우기 전에 한 번 묻는다. 창 위에 뜨는 작은 창이라, 아니라고 하면 그것만 닫힌다. */
+/* 고치려는데 로그인하지 않았을 때 */
+export function openLoginDialog(){
+  var scrim = el('<div class="scrim mid"><div class="dialog ask login" role="alertdialog" aria-modal="true">' +
+    '<h3>편집하려면 로그인해 주세요</h3>' +
+    '<p class="dialog-body">등록 · 수정 · 삭제는 주인 계정만 할 수 있습니다. 보는 것은 누구나 할 수 있습니다.</p>' +
+    '<a class="kakao" href="api/auth?login"><svg class="kakao-mark" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path fill="currentColor" d="M12 3.5C6.8 3.5 2.6 6.8 2.6 10.9c0 2.6 1.7 4.9 4.3 6.2l-1 3.7c-.1.3.3.6.6.4l4.3-2.9c.4 0 .8.1 1.2.1 5.2 0 9.4-3.3 9.4-7.5S17.2 3.5 12 3.5z"/></svg>카카오로 로그인</a>' +
+    '<div class="dialog-actions"><span class="spacer"></span><button class="btn-text" data-a="no">닫기</button></div></div></div>');
+  function no(){ closeTop(scrim); }
+  scrim.querySelector('[data-a="no"]').addEventListener("click", no);
+  scrim.addEventListener("click", function(e){ if (e.target === scrim) no(); });
+  showOverlay(scrim);
+}
+
 export function openAskDialog(opts, onYes){
   var scrim = el('<div class="scrim mid"><div class="dialog ask" role="alertdialog" aria-modal="true">' +
     '<h3>' + esc(opts.title || "삭제하시겠습니까?") + '</h3>' +

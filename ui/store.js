@@ -15,6 +15,8 @@ export var Store = {
   /* "wait" · "ok" · "setup"(서버 설정이 덜 됨) · "down"(서버가 없거나 닿지 않음) */
   state: "wait",
   message: "",
+  auth: false,        /* 카카오 로그인이 차려져 있는가 */
+  me: false,          /* 내가 고칠 수 있는 사람인가 */
   deals: false,       /* 실거래가가 켜져 있는가 (MOLIT_SERVICE_KEY) */
   watches: [],
   series: {},
@@ -30,6 +32,8 @@ export var Store = {
       }
       this.state = "ok";
       this.deals = !!data.deals;
+      this.auth = !!data.auth;
+      this.me = !!data.me;
       var hidden = this._hidden;
       this.watches = (data.watches || []).filter(function(w){ return !hidden[w.id]; });
       this.series = data.series || {};
@@ -93,8 +97,9 @@ export var Store = {
     });
   },
 
-  /* 로그인이 없다 — 주소를 아는 사람은 누구나 고친다. 창(ui/sheet.js)이 묻는
-     말이라 자리는 남겨 둔다. */
-  canEdit(){ return true; },
-  deny(){ toast("지금은 고칠 수 없습니다.", true); }
+  /* 고치는 일은 카카오로 로그인한 주인만 한다. 로그인이 차려지지 않은 곳(내 컴퓨터)에서는
+     누구나 고친다. 못 고칠 때 무엇을 보여줄지는 화면이 정해 넣는다(onDeny). */
+  canEdit(){ return !this.auth || this.me; },
+  onDeny: null,
+  deny(){ if (this.onDeny) this.onDeny(); else toast("카카오 로그인이 필요합니다.", true); }
 };
