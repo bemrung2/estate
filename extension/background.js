@@ -114,10 +114,27 @@ async function read(complex) {
   }
 }
 
+/* BEMESTATE에 묻는다. 닿지 못하면 왜인지 알 수 있는 말로 던진다. */
 async function api(site, init) {
-  const res = await fetch(site + "/api/watch", Object.assign({ cache: "no-store" }, init));
+  /* vercel.app 주소에는 권한이 있어 로그인 쿠키도 함께 간다 (보호된 배포 주소일 때 필요하다) */
+  const mine = /\.vercel\.app$/.test(new URL(site).hostname);
+  const ask = () => fetch(site + "/api/watch", Object.assign({ cache: "no-store", credentials: mine ? "include" : "omit" }, init));
+  let res;
+  try { res = await ask(); }
+  catch (e) {
+    await wait(2000);
+    try { res = await ask(); }
+    catch (e2) {
+      throw new Error("BEMESTATE(" + site + ")에 닿지 못했습니다. 주소가 맞는지, 배포가 끝났는지 확인해 주세요. [" +
+        String(e2.message || e2) + "]");
+    }
+  }
   const data = await res.json().catch(() => null);
-  if (!data || !data.ok) throw new Error((data && (data.message || data.error)) || "BEMESTATE 오류 " + res.status);
+  if (!data) {
+    throw new Error("BEMESTATE가 엉뚱한 답을 했습니다 (" + res.status + (res.redirected ? ", " + new URL(res.url).hostname + "(으)로 넘어감" : "") +
+      "). 로그인이 필요한 미리보기 주소가 아닌, 공개된 주소를 넣어 주세요.");
+  }
+  if (!data.ok) throw new Error(data.message || data.error || "BEMESTATE 오류 " + res.status);
   return data;
 }
 
