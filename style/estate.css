@@ -439,3 +439,7 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 @keyframes spin{ to{ transform: rotate(360deg); } }
 .dangerfoot .linkbtn.busy:disabled{ opacity: 1; color: var(--signal); }
 @media (prefers-reduced-motion: reduce){ .spin{ animation-duration: 2s; } }
+.watch-gap{ flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+.watch-gap > span b{ font-weight: 700; color: var(--ink); }
+.watch-gap .chg{ margin-left: auto; }
+.watch-gap small{ margin-left: 0; }

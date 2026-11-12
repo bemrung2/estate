@@ -435,8 +435,10 @@ function watchCard(w, view){
     /* 호가와 실거래를 같은 크기로 나란히 — 둘을 견주는 것이 이 카드의 일이다 */
     (deal ? '<div class="watch-price deal"><span class="lbl">직전 실거래 · ' + dayShort(deal.date) + '</span>' +
       '<b>' + won(deal.price) + '</b></div>' : '') + '</div>' +
-    (pg ? '<div class="watch-gap ' + (pg.d > 0 ? "up" : pg.d < 0 ? "down" : "") + '"><span>1년 최고 실거래 ' +
-      won(pg.peak.price) + ' 대비</span>' + gapMark(pg) + '<small>' + dayShort(pg.slot) + ' 호가</small></div>' : '') +
+    /* 한 줄: 1년 최고 실거래와 그 날짜, 그리고 지금 호가와의 차. 견준 호가가 오늘 것이 아닐 때만 그 날짜를 덧붙인다 */
+    (pg ? '<div class="watch-gap ' + (pg.d > 0 ? "up" : pg.d < 0 ? "down" : "") + '"><span>1년 최고 <b>' +
+      won(pg.peak.price) + '</b> · ' + dayShort(pg.peak.date) + '</span>' + gapMark(pg) +
+      (last && pg.slot !== last.slot ? '<small>' + dayShort(pg.slot) + ' 호가</small>' : '') + '</div>' : '') +
     (last ? '<div class="watch-foot"><span>매물 <b>' + last.count + '</b>건</span>' +
       (prev ? chg(last.min_price, prev.min_price) : "") +
       sparkline(series.map(function(s){ return s.min_price; })) +
