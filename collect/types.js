@@ -5,7 +5,14 @@
  */
 function members(w) {
   const many = Array.isArray(w.room_types) ? w.room_types.filter((t) => t && t.id) : [];
-  if (many.length) return many.map((t) => ({ id: String(t.id), supply: Number(t.supply) || 0, exclusive: Number(t.exclusive) || 0 }));
+  /* 직방은 매물이 없는 평형의 면적을 주지 않는다. 그런 평형은 묶음의 면적(같은 평형이라 묶인
+     것이다)을 따른다. */
+  if (many.length) {
+    return many.map((t) => ({
+      id: String(t.id), supply: Number(t.supply) || Number(w.supply_m2) || 0,
+      exclusive: Number(t.exclusive) || Number(w.exclusive_m2) || 0
+    }));
+  }
   return [{ id: String(w.room_type_id), supply: Number(w.supply_m2) || 0, exclusive: Number(w.exclusive_m2) || 0 }];
 }
 

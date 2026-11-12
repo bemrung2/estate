@@ -910,7 +910,15 @@ function openAdd(){
         if (open && t.exclusive - open[0].exclusive <= 1) open.push(t);
         else groups.push(open = [t]);
       });
-    types.forEach(function(t){ if (!t.exclusive) groups.push([t]); });
+    /* 전용 면적을 모르는 평형(직방에 매물이 없으면 면적이 오지 않는다)은 평수가 같은 묶음에
+       넣는다 — 25A는 25B가 든 묶음으로. 그런 묶음이 없으면 같은 평수끼리 묶는다. */
+    var pyOf = function(t){ return Number((String(t.label).match(/(\d+)[A-Za-z0-9]*평/) || [])[1]) || 0; };
+    types.forEach(function(t){
+      if (t.exclusive) return;
+      var py = pyOf(t);
+      var home = py ? groups.filter(function(g){ return g.some(function(x){ return pyOf(x) === py; }); })[0] : null;
+      if (home) home.push(t); else groups.push([t]);
+    });
     /* 묶은 뒤에도 원래 차례(작은 평형부터)로 — 묶음은 그 안의 가장 작은 평형 자리에 선다 */
     groups.forEach(function(g){ g.sort(function(a, b){ return types.indexOf(a) - types.indexOf(b); }); });
     groups.sort(function(a, b){ return types.indexOf(a[0]) - types.indexOf(b[0]); });
@@ -929,8 +937,8 @@ function openAdd(){
       return {
         key: g.map(function(t){ return t.id; }).join("_"), count: count, n: g.length,
         label: [m2.length ? span(m2) + "㎡" : "", py.length ? span(py) + "평" : ""].filter(Boolean).join(" · ") ||
-          "전용 " + Math.floor(first.exclusive) + "㎡",
-        id: first.id, supply: first.supply, exclusive: first.exclusive,
+          first.label,
+        id: first.id, supply: first.supply, exclusive: (g.filter(function(t){ return t.exclusive; })[0] || first).exclusive,
         members: g.map(function(t){ return { id: t.id, supply: t.supply, exclusive: t.exclusive }; })
       };
     });
