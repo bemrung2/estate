@@ -48,11 +48,16 @@ async function grab() {
     const hi = document.querySelector('[class*="ArticleListWrapper"] [class*="__highlight"]');
     return hi ? parseInt(hi.textContent.replace(/\D/g, ""), 10) || 0 : -1;
   };
-  /* 화면이 다 뜰 때까지 */
-  for (let i = 0; i < 40 && !cards().length && count() !== 0; i++) await nap(500);
+  /* 화면이 다 뜰 때까지. 목록을 받는 동안에는 건수가 잠깐 0으로 보이기도 한다 — 0이
+     열 번(5초) 내리 이어져야 정말 매물이 없는 것으로 친다. */
+  let zero = 0;
+  for (let i = 0; i < 60 && !cards().length && zero < 10; i++) {
+    zero = count() === 0 ? zero + 1 : 0;
+    await nap(500);
+  }
   const total = Math.max(0, count());
   if (!cards().length) {
-    return count() === 0 ? { total: 0, rows: [] } : { error: "매물 목록이 뜨지 않았습니다 (" + document.title + ")" };
+    return zero >= 10 ? { total: 0, rows: [] } : { error: "매물 목록이 뜨지 않았습니다 (" + document.title + ")" };
   }
   /* 목록은 내려갈 때마다 더 실린다 — 더 늘지 않을 때까지 끝으로 내린다 */
   let last = -1, still = 0;
@@ -133,6 +138,13 @@ async function collect() {
       try {
         const got = await read(id);
         if (got.error) throw new Error(got.error);
+        if (!got.rows.length) {
+          /* 정말 없는 것인지, 잘못 이어진 단지인지 여기서는 모른다 — 기록은 건드리지 않고 알린다 */
+          log.push({ ok: false, text: names[id] + " — 네이버 화면에 매물이 0건입니다 (네이버 단지 " + id +
+            "). 다른 단지로 이어져 있지 않은지 확인해 주세요." });
+          await wait(3000);
+          continue;
+        }
         const done = await api(site, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ importNaver: { complex: id, rows: got.rows } })

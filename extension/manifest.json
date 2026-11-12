@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BEMESTATE 네이버 매물",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "하루에 한 번, 관심 단지의 네이버 부동산 매물 탭을 열어 화면의 목록을 BEMESTATE에 기록합니다.",
   "permissions": [
     "alarms",

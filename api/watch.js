@@ -27,7 +27,10 @@ const MAX_WATCHES = 40;
 const SLOT = /^\d{4}-\d{2}-\d{2}(T12)?$/;
 /* 예전에는 하루 두 번(…T00 · …T12) 기록했다. 00시 것은 더 보여주지 않는다 —
    db/schema.sql을 다시 실행하면 표에서도 지워진다. */
-const current = (rows) => (rows || []).filter((s) => !/T00$/.test(s.slot));
+/* 그날 수집이 아직 돌지 않아 호가가 하나도 없는 날(예: 낮 12시 전의 오늘)은 날짜째 감춘다.
+   수집이 돌았는데도 매물이 없던 날은 남긴다 — 화면이 "매물이 없었습니다"라고 말한다. */
+const collected = (s) => Number(s.count) > 0 || !s.sources || s.sources.zigbang === "ok";
+const current = (rows) => (rows || []).filter((s) => !/T00$/.test(s.slot) && collected(s));
 
 function clean(s, max) { return String(s == null ? "" : s).trim().slice(0, max); }
 const area = (v) => { const n = Number(v); return n > 0 && n < 1000 ? Math.round(n * 100) / 100 : null; };
