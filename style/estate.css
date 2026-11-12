@@ -404,7 +404,9 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 .mergebtn:focus-visible{ outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 6px; }
 .pick-g{ margin-left: 6px; font-size: 10.5px; font-weight: 600; opacity: 0.7; }
 /* ---------- 정렬 · 카드를 조금 더 작게 ---------- */
-.sortbar{ margin: 0 0 4px; padding-bottom: 10px; }
+/* 머리줄 바로 아래에 붙어 서고, 카드와는 한 칸 띄운다. 좌우는 화면 끝까지 흐른다. */
+.page-head:has(+ .sortbar){ margin-bottom: 12px; }
+.pickrow.scroll.sortbar{ margin: 0 -18px 14px; padding: 0 18px 2px; }
 .sortbar .pick{ padding: 5px 11px; font-size: 12px; }
 .sort-dir{ margin-left: 3px; font-size: 11px; }
 .trip-list{ gap: 10px; }
