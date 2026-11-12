@@ -210,18 +210,20 @@ var HOLD_MS = 420;
 function dragToReorder(list, item, ids, view){
   if (!Store.canEdit()) return;
   item._ids = ids;
-  var timer = null, id = null, x0 = 0, y0 = 0, lifted = false, changed = false;
+  var timer = null, id = null, x0 = 0, y0 = 0, lifted = false, slots = [], from = 0, to = 0, step = 0;
   function items(){ return Array.prototype.filter.call(list.children, function(n){ return n._ids; }); }
   function stop(){ clearTimeout(timer); timer = null; }
   function drop(){
     stop();
     if (!lifted){ id = null; return; }
     lifted = false; id = null;
-    item.style.transition = "transform 180ms cubic-bezier(0.2, 0, 0, 1)";
-    item.style.transform = "";
-    setTimeout(function(){ item.classList.remove("lifted"); item.style.transition = ""; }, 180);
+    slots.forEach(function(sl){ sl.node.style.transition = "none"; sl.node.style.transform = ""; });
+    if (to !== from) list.insertBefore(item, to > from ? slots[to].node.nextSibling : slots[to].node);
+    item.classList.remove("lifted");
     list.classList.remove("sorting");
-    if (!changed) return;
+    void list.offsetWidth;
+    slots.forEach(function(sl){ sl.node.style.transition = ""; });
+    if (to === from) return;
     var order = [];
     items().forEach(function(n){ order = order.concat(n._ids); });
     var undo = Store.reorder(order, function(){ renderList(view); });
@@ -229,13 +231,22 @@ function dragToReorder(list, item, ids, view){
   }
   item.addEventListener("pointerdown", function(e){
     if ((e.button && e.button !== 0) || items().length < 2) return;
-    id = e.pointerId; x0 = e.clientX; y0 = e.clientY; changed = false;
+    id = e.pointerId; x0 = e.clientX; y0 = e.clientY;
     stop();
     timer = setTimeout(function(){
       timer = null;
       if (item.querySelector(".swiped") || item.classList.contains("swiped")) return;
-      lifted = true;
       if (opened) opened();
+      /* 들리는 순간의 자리들을 적어 둔다 */
+      slots = items().map(function(n){
+        var r = n.getBoundingClientRect();
+        return { node: n, top: r.top, mid: r.top + r.height / 2 };
+      });
+      from = to = slots.map(function(sl){ return sl.node; }).indexOf(item);
+      var me = item.getBoundingClientRect();
+      var next = slots[from + 1] || null, prev = slots[from - 1] || null;
+      step = next ? next.top - me.top : me.top - prev.top - (prev.node.getBoundingClientRect().height - me.height);
+      lifted = true;
       item.classList.add("lifted");
       list.classList.add("sorting");
       try{ item.setPointerCapture(id); }catch(err){ /* 이미 놓았다 */ }
@@ -245,23 +256,24 @@ function dragToReorder(list, item, ids, view){
   item.addEventListener("pointermove", function(e){
     if (e.pointerId !== id) return;
     if (!lifted){
-      if (Math.abs(e.clientX - x0) > 8 || Math.abs(e.clientY - y0) > 8) stop();      /* 밀거나 넘기는 중이다 */
+      if (Math.abs(e.clientX - x0) > 10 || Math.abs(e.clientY - y0) > 10) stop();      /* 밀거나 넘기는 중이다 */
       return;
     }
     var dy = e.clientY - y0;
     item.style.transform = "translateY(" + dy + "px) scale(1.02)";
-    /* 들린 카드의 가운데가 이웃의 가운데를 넘으면 자리를 바꾼다 */
-    var box = item.getBoundingClientRect(), mid = box.top + box.height / 2;
-    var all = items(), at = all.indexOf(item), other = null, before = false;
-    var up = all[at - 1], down = all[at + 1];
-    if (up){ var u = up.getBoundingClientRect(); if (mid < u.top + u.height / 2){ other = up; before = true; } }
-    if (!other && down){ var d = down.getBoundingClientRect(); if (mid > d.top + d.height / 2) other = down; }
-    if (!other) return;
-    var was = item.offsetTop;
-    list.insertBefore(item, before ? other : other.nextSibling);
-    y0 += item.offsetTop - was;                       /* 자리가 옮겨진 만큼 기준도 옮긴다 */
-    item.style.transform = "translateY(" + (e.clientY - y0) + "px) scale(1.02)";
-    changed = true;
+    /* 끄는 동안에는 자리를 실제로 옮기지 않는다 (옮기면 손가락이 카드를 놓친다) —
+       이웃들이 비켜서는 것만 보여주고, 놓을 때 한 번에 옮긴다. */
+    var mid = slots[from].mid + dy;
+    to = from;
+    slots.forEach(function(sl, i){
+      if (i < from && mid < sl.mid) to = Math.min(to, i);
+      if (i > from && mid > sl.mid) to = Math.max(to, i);
+    });
+    slots.forEach(function(sl, i){
+      if (i === from) return;
+      var shift = i > from && i <= to ? -step : i < from && i >= to ? step : 0;
+      sl.node.style.transform = shift ? "translateY(" + shift + "px)" : "";
+    });
   });
   item.addEventListener("pointerup", drop);
   item.addEventListener("pointercancel", drop);
