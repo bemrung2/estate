@@ -55,18 +55,23 @@ function months(now) { return monthsBack(RECENT, now); }
  * 한 번에 `budget`달씩 거슬러 간다. deals_from은 거기까지는 이미 받았다는 표시("202211").
  * → { months, from }   from = 이번 것을 받고 나면 어디까지 받은 것이 되는지
  */
+/* deals_from은 "202112~2" 꼴이다: 어느 달까지 받았나, 그리고 어떤 방법으로 가려 받았나.
+   단지를 가리는 방법이 바뀌면 숫자를 올린다 — 옛 방법으로 받은 것은 처음부터 다시 받는다. */
+const MARK = "~2";
+const upTo = (w) => (String(w.deals_from || "").endsWith(MARK) ? String(w.deals_from).slice(0, 6) : "");
+
 function plan(group, budget, now) {
   const all = monthsBack(SPAN, now);
   const recent = all.slice(0, RECENT);
-  const known = group.every((w) => w.deals_from) ? group.map((w) => w.deals_from).sort().pop() : "";
+  const known = group.every((w) => upTo(w)) ? group.map((w) => upTo(w)).sort().pop() : "";
   const older = all.slice(RECENT).filter((ym) => !known || ym < known).slice(0, Math.max(0, budget));
   const from = older.length ? older[older.length - 1] : (known && known < recent[RECENT - 1] ? known : recent[RECENT - 1]);
-  return { months: recent.concat(older), from };
+  return { months: recent.concat(older), from: from + MARK };
 }
 
 /* 5년 전까지 다 받았는가 */
 function complete(w, now) {
-  return !!w.deals_from && w.deals_from <= monthsBack(SPAN, now)[SPAN - 1];
+  return !!upTo(w) && upTo(w) <= monthsBack(SPAN, now)[SPAN - 1];
 }
 
 /* 인증키는 두 가지로 나눠 준다: 그대로인 것(Decoding)과 주소에 넣게 바꿔 둔 것(Encoding).
@@ -185,15 +190,26 @@ function deal(trade, it) {
   };
 }
 
-/* 그 구의 거래 가운데 이 단지의 것. 지번이 맞는 것이 단지다 — 지번으로 하나도 안 잡히면
-   (지번 표기가 다르거나 모를 때) 이름이 같은 것으로 잡는다. */
+/*
+ * 그 구의 거래 가운데 이 단지의 것: 같은 동에서 지번이 맞거나 이름이 같은 것.
+ *
+ * 둘을 함께 본다. 큰 단지는 직방에는 한 단지(지번 하나)로 올라 있어도 실거래 신고는 단지별
+ * 지번(1075 · 1076 …)으로 나뉘어 들어온다 — 지번만 보면 그 가운데 한 곳의 거래만 잡힌다.
+ * 이름은 "…1단지"처럼 단지 번호가 붙은 것까지 같은 단지로 본다 ("…2차"는 다른 단지다).
+ */
+function sameName(aptNm, name) {
+  const a = plain(aptNm), n = plain(name);
+  if (!a || !n) return false;
+  if (a === n) return true;
+  const strip = (v) => v.replace(/제?\d+단지$/, "");
+  return strip(a) === strip(n) && strip(a).length >= 4;
+}
 function ofComplex(rows, head) {
-  const byLot = head.jibun ? rows.filter((it) =>
-    plain(it.umdNm) === plain(head.dong_name) && lot(it.jibun) === lot(head.jibun)) : [];
-  if (byLot.length) return byLot;
-  const name = plain(head.complex_name);
-  return rows.filter((it) => plain(it.aptNm) === name &&
-    (!head.dong_name || plain(it.umdNm) === plain(head.dong_name)));
+  return rows.filter((it) => {
+    if (head.dong_name && plain(it.umdNm) !== plain(head.dong_name)) return false;
+    if (head.jibun && head.dong_name && lot(it.jibun) === lot(head.jibun)) return true;
+    return sameName(it.aptNm, head.complex_name);
+  });
 }
 
 const sameArea = (it, w) => members(w).some((t) => t.exclusive && Math.abs(num(it.excluUseAr) - t.exclusive) <= 0.5);
