@@ -312,6 +312,7 @@ function dragToReorder(list, item, ids, view){
   if (!Store.canEdit()) return;
   item._ids = ids;
   var timer = null, id = null, x0 = 0, y0 = 0, lifted = false, slots = [], from = 0, to = 0, step = 0;
+  var lastY = 0, scroll0 = 0, raf = 0;
   function items(){ return Array.prototype.filter.call(list.children, function(n){ return n._ids; }); }
   function stop(){ clearTimeout(timer); timer = null; }
   function drop(){
@@ -348,6 +349,8 @@ function dragToReorder(list, item, ids, view){
       var next = slots[from + 1] || null, prev = slots[from - 1] || null;
       step = next ? next.top - me.top : me.top - prev.top - (prev.node.getBoundingClientRect().height - me.height);
       lifted = true;
+      lastY = y0; scroll0 = window.scrollY;
+      if (!raf) raf = requestAnimationFrame(creep);
       item.classList.add("lifted");
       list.classList.add("sorting");
       try{ item.setPointerCapture(id); }catch(err){ /* 이미 놓았다 */ }
@@ -360,7 +363,12 @@ function dragToReorder(list, item, ids, view){
       if (Math.abs(e.clientX - x0) > 10 || Math.abs(e.clientY - y0) > 10) stop();      /* 밀거나 넘기는 중이다 */
       return;
     }
-    var dy = e.clientY - y0;
+    lastY = e.clientY;
+    place();
+  });
+  /* 들린 카드와 이웃들을 지금 손가락 자리에 맞춰 놓는다. 화면이 구른 만큼도 함께 센다. */
+  function place(){
+    var dy = lastY - y0 + (window.scrollY - scroll0);
     item.style.transform = "translateY(" + dy + "px) scale(1.02)";
     /* 끄는 동안에는 자리를 실제로 옮기지 않는다 (옮기면 손가락이 카드를 놓친다) —
        이웃들이 비켜서는 것만 보여주고, 놓을 때 한 번에 옮긴다. */
@@ -375,7 +383,20 @@ function dragToReorder(list, item, ids, view){
       var shift = i > from && i <= to ? -step : i < from && i >= to ? step : 0;
       sl.node.style.transform = shift ? "translateY(" + shift + "px)" : "";
     });
-  });
+  }
+  /* 손가락이 화면 위아래 끝에 가까우면 그쪽으로 화면을 굴린다 — 끝에 가까울수록 빠르게 */
+  function creep(){
+    if (!lifted){ raf = 0; return; }
+    var edge = 90, h = window.innerHeight, v = 0;
+    if (lastY < edge) v = -Math.ceil((edge - lastY) / 6);
+    else if (lastY > h - edge) v = Math.ceil((lastY - (h - edge)) / 6);
+    if (v){
+      var was = window.scrollY;
+      window.scrollBy(0, Math.max(-16, Math.min(16, v)));
+      if (window.scrollY !== was) place();
+    }
+    raf = requestAnimationFrame(creep);
+  }
   item.addEventListener("pointerup", drop);
   item.addEventListener("pointercancel", drop);
   /* 들린 동안에는 화면이 따라 구르지 않게, 그리고 놓는 손이 카드를 여는 누름이 되지 않게 */
