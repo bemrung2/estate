@@ -385,3 +385,21 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 .card.stale{ opacity: 0.55; transition: opacity 120ms; }
 .chart .sel{ fill: none; stroke: var(--chart-ask); stroke-width: 2; opacity: 0.55; }
 .chart-wrap{ cursor: pointer; -webkit-user-select: none; user-select: none; }
+/* ---------- 같은 평형 묶기 ---------- */
+.fld label{ position: relative; }
+.mergebtn{
+  float: right; display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+}
+.mergebtn i{
+  position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--line); transition: background 160ms;
+}
+.mergebtn i::after{
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 160ms;
+}
+.mergebtn[aria-checked="true"]{ color: var(--signal); }
+.mergebtn[aria-checked="true"] i{ background: var(--signal); }
+.mergebtn[aria-checked="true"] i::after{ transform: translateX(12px); }
+.mergebtn:focus-visible{ outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 6px; }
+.pick-g{ margin-left: 6px; font-size: 10.5px; font-weight: 600; opacity: 0.7; }

@@ -440,6 +440,13 @@ export function renderWatch(view, id, slot){
   });
 }
 
+/* 이 관심이 보는 전용 면적들: "60" · 묶음이면 "59.82 · 59.97" */
+function areasOf(w){
+  var many = (w.room_types || []).map(function(t){ return t.exclusive; }).filter(Boolean);
+  var uniq = many.filter(function(v, i){ return many.indexOf(v) === i; });
+  return uniq.length ? uniq.join(" · ") : String(w.exclusive_m2);
+}
+
 function liveDeals(w){ return (w.deals || []).filter(function(d){ return !d.canceled; }); }
 
 /* live: null(기록을 본다) · "wait"(지금 것을 받는 중) · { snapshot, previous }(지금 것) */
@@ -718,7 +725,7 @@ function dealsCard(w){
     note();
   }
   function note(){
-    body.appendChild(el('<p class="src-note">국토교통부 실거래가 공개시스템 · 전용 ' + esc(String(w.exclusive_m2)) + '㎡' +
+    body.appendChild(el('<p class="src-note">국토교통부 실거래가 공개시스템 · 전용 ' + esc(areasOf(w)) + '㎡' +
       (w.deals_complete === false ? ' · 5년치를 거슬러 받는 중입니다 — 다시 열면 더 채워집니다' : '') + '</p>'));
   }
   paint(false);
@@ -781,7 +788,7 @@ function openAdd(){
   foot.appendChild(save);
   foot.hidden = true;
 
-  var chosen = null, trade = "trade", types = [], picked = {}, naverInput = null;
+  var chosen = null, trade = "trade", types = [], picked = {}, naverInput = null, merge = false;
   var asked = 0;
 
   function stepSearch(){
@@ -840,9 +847,19 @@ function openAdd(){
       function(){ return trade; }, function(k){ trade = k; paintTypes(); });
     body.appendChild(tr);
 
-    body.appendChild(el('<div class="fld"><label>평형 <span class="opt">여럿 고를 수 있음</span></label>' +
+    var tf = el('<div class="fld"><label>평형 <span class="opt">여럿 고를 수 있음</span>' +
+      '<button class="mergebtn" type="button" role="switch" aria-checked="' + merge + '"><i></i>같은 평형 묶기</button></label>' +
       '<div class="pickrow" id="types"><p class="card-empty">평형을 불러오는 중…</p></div>' +
-      '<p class="fld-hint">숫자는 지금 직방에 올라와 있는 매물 수입니다.</p></div>'));
+      '<p class="fld-hint">숫자는 지금 직방에 올라와 있는 매물 수입니다.</p></div>');
+    /* 59A · 59B처럼 전용 면적이 같은 평형들을 하나로 묶어 본다 */
+    var sw = tf.querySelector(".mergebtn");
+    sw.addEventListener("click", function(e){
+      e.preventDefault();
+      merge = !merge; picked = {};
+      sw.setAttribute("aria-checked", String(merge));
+      paintTypes();
+    });
+    body.appendChild(tf);
 
     /* 네이버 부동산은 단지 번호가 따로다. 먼저 이름으로 찾아보고, 안 되면 붙여넣게 한다. */
     var nv = el('<div class="fld"><label for="nv">네이버 부동산 단지 <span class="opt">선택</span></label>' +
@@ -881,16 +898,46 @@ function openAdd(){
     });
   }
 
+  /* 고를 수 있는 것들. 묶기를 켜면 전용 면적(정수)이 같은 평형들이 하나가 된다. */
+  function options(){
+    if (!merge) return types.map(function(t){ return { key: t.id, label: t.label, count: t.count, id: t.id, supply: t.supply, exclusive: t.exclusive }; });
+    /* 전용 면적 순으로 세워, 묶음의 가장 작은 것과 1㎡ 안에 드는 것까지 한 묶음.
+       전용 면적을 모르는 평형은 혼자 남는다. */
+    var groups = [], open = null;
+    types.filter(function(t){ return t.exclusive; })
+      .sort(function(a, b){ return a.exclusive - b.exclusive; })
+      .forEach(function(t){
+        if (open && t.exclusive - open[0].exclusive <= 1) open.push(t);
+        else groups.push(open = [t]);
+      });
+    types.forEach(function(t){ if (!t.exclusive) groups.push([t]); });
+    return groups.map(function(g){
+      var first = g[0];
+      if (g.length < 2) return { key: first.id, label: first.label, count: first.count, id: first.id, supply: first.supply, exclusive: first.exclusive };
+      var py = g.map(function(t){ return Number((String(t.label).match(/(\d+)[A-Za-z0-9]*평/) || [])[1]) || 0; }).filter(Boolean);
+      var lo = Math.min.apply(null, py), hi = Math.max.apply(null, py);
+      var count = {};
+      g.forEach(function(t){ Object.keys(t.count || {}).forEach(function(k){ count[k] = (count[k] || 0) + t.count[k]; }); });
+      return {
+        key: g.map(function(t){ return t.id; }).join("_"), count: count, n: g.length,
+        label: (py.length ? (lo === hi ? lo : lo + "~" + hi) + "평 · " : "") + "전용 " + Math.floor(first.exclusive) + "㎡",
+        id: first.id, supply: first.supply, exclusive: first.exclusive,
+        members: g.map(function(t){ return { id: t.id, supply: t.supply, exclusive: t.exclusive }; })
+      };
+    });
+  }
+
   function paintTypes(){
     var row = body.querySelector("#types");
     if (!row || !types.length) return;
     row.innerHTML = "";
-    types.forEach(function(t){
-      var b = el('<button class="pick" type="button" aria-pressed="' + !!picked[t.id] + '">' + esc(t.label) +
+    options().forEach(function(t){
+      var b = el('<button class="pick" type="button" aria-pressed="' + !!picked[t.key] + '">' + esc(t.label) +
+        (t.n ? '<span class="pick-g">' + t.n + '개 평형</span>' : '') +
         '<span class="pick-n">' + ((t.count && t.count[trade]) || 0) + '</span></button>');
       ripple(b, function(){
-        picked[t.id] = !picked[t.id];
-        b.setAttribute("aria-pressed", String(!!picked[t.id]));
+        picked[t.key] = !picked[t.key];
+        b.setAttribute("aria-pressed", String(!!picked[t.key]));
       });
       row.appendChild(b);
     });
@@ -898,7 +945,7 @@ function openAdd(){
 
   ripple(save, function(){
     if (save.disabled) return;
-    var want = types.filter(function(t){ return picked[t.id]; });
+    var want = options().filter(function(t){ return picked[t.key]; });
     if (!want.length) return flag(null, "평형을 하나 이상 골라 주세요.");
     var nv = naverInput ? naverInput.value.trim() : "";
     if (nv && !/(complex(es)?\/(info\/)?\d+|hscpNo=\d+|^\d+$)/.test(nv)){
@@ -908,7 +955,7 @@ function openAdd(){
     save.textContent = "등록하는 중…";
     Store.post({ add: {
       complexId: chosen.id, complexName: chosen.name, address: chosen.address, trade: trade, naver: nv,
-      types: want.map(function(t){ return { id: t.id, label: t.label, supply: t.supply, exclusive: t.exclusive }; })
+      types: want.map(function(t){ return { id: t.id, label: t.label, supply: t.supply, exclusive: t.exclusive, members: t.members }; })
     } }).then(function(data){
       if (!data){ save.disabled = false; save.textContent = "등록"; return; }
       closeOverlay();

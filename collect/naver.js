@@ -17,6 +17,8 @@ function complexNo(text) {
   return m ? m[1] : "";
 }
 
+const { members } = require("./types.js");
+
 const text = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
 const num = (v, max) => { const n = Number(v); return n > 0 && n < max ? n : 0; };
 
@@ -68,8 +70,10 @@ function parse(rows) {
 
 /* 이 매물이 그 평형과 얼마나 먼가 (전용 면적의 차). 같은 평형일 수 없으면 Infinity */
 function distance(l, w) {
-  const own = Number(w.exclusive_m2), supply = Number(w.supply_m2);
   if (l.trade !== w.trade) return Infinity;
+  return Math.min.apply(null, members(w).map((t) => near(l, t.exclusive, t.supply)));
+}
+function near(l, own, supply) {
   if (own && l.exclusive) {
     const d = Math.abs(l.exclusive - own);
     if (d > 0.6) return Infinity;

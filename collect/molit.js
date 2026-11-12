@@ -13,6 +13,7 @@
  * 없어 실제 거래 목록은 받아보지 못했다. 그래서 답이 JSON이든 XML이든, 이름이 영문이든
  * 한글이든 읽도록 해 두었고, /api/probe 가 어디서 걸러지는지 단계별로 보여준다.
  */
+const { members } = require("./types.js");
 const BASE = "https://apis.data.go.kr/1613000/";
 const PATH = {
   trade: "RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev",
@@ -195,7 +196,7 @@ function ofComplex(rows, head) {
     (!head.dong_name || plain(it.umdNm) === plain(head.dong_name)));
 }
 
-const sameArea = (it, w) => Math.abs(num(it.excluUseAr) - Number(w.exclusive_m2)) <= 0.5;
+const sameArea = (it, w) => members(w).some((t) => t.exclusive && Math.abs(num(it.excluUseAr) - t.exclusive) <= 0.5);
 const newest = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
 async function rowsFor(head, cache, yms) {

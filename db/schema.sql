@@ -22,6 +22,7 @@ create table if not exists estate_watches (
 alter table estate_watches add column if not exists naver_id     text not null default '';  -- 네이버 단지 번호
 alter table estate_watches add column if not exists supply_m2    numeric;                   -- 공급 면적
 alter table estate_watches add column if not exists exclusive_m2 numeric;                   -- 전용 면적
+alter table estate_watches add column if not exists room_types   jsonb;                     -- 같은 평형 묶기: [{id,supply,exclusive}]
 alter table estate_watches add column if not exists lawd_cd      text not null default '';  -- 시군구 5자리 (실거래가 조회)
 alter table estate_watches add column if not exists dong_name    text not null default '';  -- 법정동
 alter table estate_watches add column if not exists jibun        text not null default '';  -- 지번

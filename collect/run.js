@@ -13,6 +13,7 @@ const naver = require("./naver.js");
 const molit = require("./molit.js");
 const hogangnono = require("./hogangnono.js");
 const kb = require("./kb.js");
+const { members } = require("./types.js");
 
 /* 서버가 직접 받는 곳은 직방뿐이다. 네이버 매물은 크롬 확장이 넘겨준다(importNaver) — 수집 때는
    오늘 넘겨받아 둔 것을 그대로 둔다. */
@@ -65,7 +66,8 @@ function listingsFor(w, fetched, before) {
   let listings = [];
   Object.keys(PLATFORMS).forEach((src) => {
     if (fetched.got[src]) {
-      const mine = fetched.got[src].filter((l) => l.type === w.room_type_id);
+      const ids = members(w).map((t) => t.id);
+      const mine = fetched.got[src].filter((l) => ids.indexOf(l.type) >= 0);
       listings = listings.concat(mine.map(keep));
       sources[src] = "ok";
     } else {

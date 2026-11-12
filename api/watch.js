@@ -216,16 +216,26 @@ module.exports = async function handler(req, res) {
       for (const t of types) {
         const typeId = clean(t && t.id, 12);
         if (!/^\d+$/.test(typeId)) return lib.json(res, 400, { ok: false, error: "body" });
-        const id = ["zigbang", complexId, typeId, add.trade].join("-");
+        /* 같은 평형 묶기: 전용 면적이 같은 평형 여럿을 한 관심으로 */
+        const group = (Array.isArray(t.members) ? t.members.slice(0, 8) : [])
+          .map((m) => ({ id: clean(m && m.id, 12), supply: area(m && m.supply), exclusive: area(m && m.exclusive) }))
+          .filter((m) => /^\d+$/.test(m.id));
+        const grouped = group.length > 1;
+        const id = ["zigbang", complexId, grouped ? group.map((m) => m.id).join("_") : typeId, add.trade].join("-");
         if (existing.some((w) => w.id === id)) continue;       /* 이미 보고 있는 평형 */
-        await data.putWatch({
+        try { await data.putWatch({
+          ...(grouped ? { room_types: group } : {}),
           id, source: "zigbang", complex_id: complexId,
           complex_name: clean(add.complexName, 60), address: clean(add.address, 80),
           room_type_id: typeId, room_label: clean(t.label, 30), trade: add.trade,
           naver_id: naverId, supply_m2: area(t.supply), exclusive_m2: area(t.exclusive),
           lawd_cd: clean(where.lawd_cd, 5), dong_name: clean(where.dong_name, 30), jibun: clean(where.jibun, 20),
           hgnn_id: (sibling && sibling.hgnn_id) || "", deals: [], ord: ++ord, created_at: new Date().toISOString()
-        });
+        }); } catch (e) {
+          if (!grouped || !/room_types/.test(String(e.message))) throw e;
+          return lib.json(res, 400, { ok: false, error: "schema",
+            message: "묶어서 등록하려면 Supabase에서 db/schema.sql을 한 번 다시 실행해 주세요 (room_types 칸 추가)." });
+        }
         added.push(id);
       }
 
