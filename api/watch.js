@@ -40,6 +40,15 @@ function brief(w) {
 }
 
 module.exports = async function handler(req, res) {
+  /* 크롬 확장(extension/)이 제 자리에서 부를 수 있게 — 확장은 이 주소에 따로 권한을 받지 않는다 */
+  const from = String(req.headers.origin || "");
+  if (/^chrome-extension:\/\/[a-p]{32}$/.test(from)) {
+    res.setHeader("access-control-allow-origin", from);
+    res.setHeader("access-control-allow-methods", "GET, POST");
+    res.setHeader("access-control-allow-headers", "content-type");
+    res.setHeader("vary", "origin");
+    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+  }
   const home = open();
   if (home.missing.length) return lib.setupError(res, home.missing);
   const data = home.data;

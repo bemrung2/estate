@@ -28,13 +28,6 @@ function origin(text) {
 async function save() {
   const site = origin($("site").value);
   if (!site) { say("BEMESTATE 주소를 확인해 주세요."); return false; }
-  /* vercel.app 밖의 주소(내 도메인)면 그 주소에 닿아도 되는지 한 번 묻는다 */
-  const u = new URL(site);
-  const need = { origins: [u.protocol + "//" + u.hostname + "/*"] };      /* 허용 규칙에는 포트를 적지 않는다 */
-  if (!(await chrome.permissions.contains(need)) && !(await chrome.permissions.request(need))) {
-    say("그 주소에 접근하도록 허용해야 기록할 수 있습니다.");
-    return false;
-  }
   await chrome.storage.local.set({ site, at: $("at").value || DEFAULTS.at });
   await chrome.runtime.sendMessage("schedule");
   $("site").value = site;
