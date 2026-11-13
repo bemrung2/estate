@@ -443,3 +443,4 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 .watch-gap > span b{ font-weight: 700; color: var(--ink); }
 .watch-gap .chg{ margin-left: auto; }
 .watch-gap small{ margin-left: 0; }
+.chg small{ margin-left: 4px; font-size: 10.5px; font-weight: 600; color: var(--ink-faint); }

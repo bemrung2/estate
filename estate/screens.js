@@ -284,6 +284,27 @@ function swipeToDelete(wrap, slide, w, view){
   });
 }
 
+/* 최저 호가가 마지막으로 움직인 때: 얼마나, 어느 날. 기록 안에서 움직인 적이 없으면 null */
+function lastMove(series){
+  var at = -1;
+  for (var i = series.length - 1; i >= 0; i--){
+    if (series[i].min_price == null) continue;
+    if (at < 0){ at = i; continue; }
+    if (series[i].min_price !== series[at].min_price){
+      return { d: series[at].min_price - series[i].min_price, slot: series[at].slot };
+    }
+    at = i;
+  }
+  return null;
+}
+/* "▼ 2,000만 11.10" — 오늘 움직였으면 날짜는 적지 않는다 */
+function moveMark(series){
+  var m = lastMove(series), last = series[series.length - 1];
+  if (!m) return "";
+  return '<span class="chg ' + (m.d > 0 ? "up" : "down") + '">' + delta(m.d) +
+    (last && m.slot !== last.slot ? '<small>' + dayShort(m.slot) + '</small>' : '') + '</span>';
+}
+
 function nums(w){
   var series = Store.series[w.id] || [];
   return { series: series, last: series[series.length - 1], prev: series[series.length - 2], deal: w.last_deal };
@@ -293,11 +314,10 @@ function nums(w){
 function watchRow(w, view){
   var n = nums(w);
   var under = n.deal ? '실거래 ' + won(n.deal.price)
-    : n.prev && n.last ? chg(n.last.min_price, n.prev.min_price) : "";
+    : moveMark(n.series);
   var row = el('<div class="dense-row"><button class="dense-open" type="button">' +
     '<span class="dense-id"><span class="watch-type">' + esc(w.room_label) + '</span>' +
       '<small>' + TRADE[w.trade] + (n.last ? ' · 매물 ' + n.last.count + '건' : ' · 기록 전') + '</small></span>' +
-    sparkline(n.series.map(function(s){ return s.min_price; })) +
     '<span class="dense-num"><b>' + (n.last && n.last.min_price != null ? won(n.last.min_price) : "—") + '</b>' +
       (under ? '<small>' + under + '</small>' : '') + '</span></button></div>');
   var open = row.querySelector(".dense-open");
@@ -440,7 +460,7 @@ function watchCard(w, view){
       won(pg.peak.price) + '</b> · ' + dayShort(pg.peak.date) + '</span>' + gapMark(pg) +
       (last && pg.slot !== last.slot ? '<small>' + dayShort(pg.slot) + ' 호가</small>' : '') + '</div>' : '') +
     (last ? '<div class="watch-foot"><span>매물 <b>' + last.count + '</b>건</span>' +
-      (prev ? chg(last.min_price, prev.min_price) : "") +
+      moveMark(series) +
       sparkline(series.map(function(s){ return s.min_price; })) +
       '<span class="watch-when">' + slotShort(last.slot) + '</span></div>' : "") +
     '</button></div></div>');
