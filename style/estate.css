@@ -444,3 +444,4 @@ a.askrow:focus-visible{ outline: 2px solid var(--signal); outline-offset: 2px; b
 .watch-gap .chg{ margin-left: auto; }
 .watch-gap small{ margin-left: 0; }
 .chg small{ margin-left: 4px; font-size: 10.5px; font-weight: 600; color: var(--ink-faint); }
+.store-note.updated{ margin-top: 6px; font-variant-numeric: tabular-nums; }

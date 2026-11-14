@@ -196,9 +196,35 @@ export function renderList(view){
       });
       pad.appendChild(foot);
     }
+    /* 직방과 네이버에서 마지막으로 받은 때 */
+    var said = ["zigbang", "naver"].map(function(src){
+      var at = lastTaken(src);
+      return at ? PLATFORM[src] + " " + stamp(at) : "";
+    }).filter(Boolean);
+    if (said.length) pad.appendChild(el('<p class="store-note updated">마지막 업데이트 · ' + said.join(" · ") + '</p>'));
   }
   pad.appendChild(pageFooter());
   swap(view, pad);
+}
+
+/* 그 플랫폼에서 가장 최근에 받은 때 (모든 관심을 통틀어). 받은 때를 따로 적기 전의 기록은
+   그 기록이 남은 때로 본다. */
+function lastTaken(src){
+  var best = "";
+  Object.keys(Store.series).forEach(function(id){
+    (Store.series[id] || []).forEach(function(s){
+      var so = s.sources || {};
+      if (so[src] !== "ok") return;
+      var at = so[src + "_at"] || s.taken_at || "";
+      if (at > best) best = at;
+    });
+  });
+  return best;
+}
+/* "11.14 09:42" (보는 사람의 시계로) */
+function stamp(iso){
+  var d = new Date(iso);
+  return (d.getMonth() + 1) + "." + d.getDate() + " " + clock(iso);
 }
 
 function swap(view, node){

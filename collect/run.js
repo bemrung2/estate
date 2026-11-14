@@ -70,6 +70,7 @@ function listingsFor(w, fetched, before) {
       const mine = fetched.got[src].filter((l) => ids.indexOf(l.type) >= 0);
       listings = listings.concat(mine.map(keep));
       sources[src] = "ok";
+      sources[src + "_at"] = new Date().toISOString();      /* 그곳에서 마지막으로 받은 때 */
     } else {
       const kept = ((before && before.listings) || []).filter((l) => (l.src || "zigbang") === src);
       listings = listings.concat(kept);
@@ -235,7 +236,7 @@ async function importNaver(data, complexNo, rows) {
     const all = others.concat(mine).sort((a, b) => a.price - b.price);
     await data.putSnapshot({
       watch_id: w.id, slot, taken_at: new Date().toISOString(), ...stats(all), listings: all,
-      sources: Object.assign({}, before && before.sources, { naver: "ok" })
+      sources: Object.assign({}, before && before.sources, { naver: "ok", naver_at: new Date().toISOString() })
     });
     done.push({ id: w.id, count: mine.length });
   }
