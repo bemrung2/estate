@@ -176,16 +176,17 @@ async function run(data, opts) {
   });
 
   const report = { slot, saved: 0, deals: molit.enabled() ? 0 : "MOLIT_SERVICE_KEY 없음", failed: [] };
-  const cache = {};
+  const started = Date.now();
+  const ready = [];
+
+  /* 먼저 호가 — 모든 단지의 오늘 기록부터 남긴다. 실거래가는 느려서(요청을 띄워 보낸다)
+     뒤로 미룬다: 앞 단지의 실거래를 받다가 시간이 다 가서 뒤 단지의 호가를 놓치면 안 된다. */
   let first = true;
   for (const key of Object.keys(groups)) {
     let group = groups[key];
     const head = group[0];
     if (!first) await pause(400);          /* 남의 서버다 — 몰아치지 않는다 */
     first = false;
-
-    try { group = await ensure(data, group); }
-    catch (e) { report.failed.push({ complex: head.complex_name, source: "단지 정보", error: why(e) }); }
 
     const fetched = await fetchGroup(group);
     fetched.failed.forEach((f) => report.failed.push(f));
@@ -197,8 +198,19 @@ async function run(data, opts) {
         report.saved++;
       }
     }
+    ready.push(group);
+  }
 
-    try { if (molit.enabled()) report.deals += await refreshDeals(data, group, cache); }
+  /* 그다음 단지 정보와 실거래가 — 남은 시간만큼만. 못 다 받은 것은 다음 수집이나 단지 화면을
+     열 때 이어 받는다 (molit.plan). 서버는 한 번에 60초까지만 돈다. */
+  const left = () => (opts.budgetMs || 45000) - (Date.now() - started);
+  const cache = {};
+  for (let group of ready) {
+    if (left() < 8000) { report.deals_later = true; break; }
+    const head = group[0];
+    try { group = await ensure(data, group); }
+    catch (e) { report.failed.push({ complex: head.complex_name, source: "단지 정보", error: why(e) }); }
+    try { if (molit.enabled()) report.deals += await refreshDeals(data, group, cache, 12); }
     catch (e) { report.failed.push({ complex: head.complex_name, source: "실거래가", error: why(e) }); }
   }
   return report;
