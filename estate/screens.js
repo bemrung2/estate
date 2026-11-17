@@ -199,7 +199,7 @@ export function renderList(view){
     /* 직방과 네이버에서 마지막으로 받은 때 */
     var said = ["zigbang", "naver"].map(function(src){
       var at = lastTaken(src);
-      return at ? PLATFORM[src] + " " + stamp(at) : "";
+      return at ? PLATFORM[src] + " " + stamp(at.at) + (BY[at.by] ? " (" + BY[at.by] + ")" : "") : "";
     }).filter(Boolean);
     var upd = el('<p class="store-note updated">' + (said.length ? '마지막 업데이트 · ' + said.join(" · ") : '') + '</p>');
     pad.appendChild(upd);
@@ -236,17 +236,18 @@ function catchUp(line){
 
 /* 그 플랫폼에서 가장 최근에 받은 때 (모든 관심을 통틀어). 받은 때를 따로 적기 전의 기록은
    그 기록이 남은 때로 본다. */
+var BY = { cron: "예약", auto: "화면 열 때", button: "직접", add: "등록" };
 function lastTaken(src){
-  var best = "";
+  var best = "", by = "";
   Object.keys(Store.series).forEach(function(id){
     (Store.series[id] || []).forEach(function(s){
       var so = s.sources || {};
       if (so[src] !== "ok") return;
       var at = so[src + "_at"] || s.taken_at || "";
-      if (at > best) best = at;
+      if (at > best){ best = at; by = so[src + "_by"] || ""; }
     });
   });
-  return best;
+  return best ? { at: best, by: by } : null;
 }
 /* "11.14 09:42" (보는 사람의 시계로) */
 function stamp(iso){

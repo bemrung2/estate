@@ -172,12 +172,12 @@ module.exports = async function handler(req, res) {
         });
         const todo = existing.filter((w) => !done[w.id]).map((w) => w.id);
         if (!todo.length) return lib.json(res, 200, { ok: true, skipped: "done" });
-        const report = await run(data, { only: todo });
+        const report = await run(data, { only: todo, by: "auto" });
         return lib.json(res, 200, { ok: true, auto: true, ...report });
       }
 
       if (body && body.collect) {
-        const report = await run(data);
+        const report = await run(data, { by: "button" });
         return lib.json(res, 200, { ok: true, ...report });
       }
 
@@ -205,7 +205,7 @@ module.exports = async function handler(req, res) {
         for (const w of mine) await data.patchWatch(w.id, { naver_id: naverId });
         let first = null;
         if (naverId) {
-          try { first = await run(data, { only: mine.map((w) => w.id) }); }
+          try { first = await run(data, { only: mine.map((w) => w.id), by: "add" }); }
           catch (e) { first = { failed: [{ error: String(e.message || e).slice(0, 200) }] }; }
         }
         return lib.json(res, 200, { ok: true, naverId, first });
@@ -263,7 +263,7 @@ module.exports = async function handler(req, res) {
          다음 수집 때 다시 받는다. */
       let first = null;
       if (added.length) {
-        try { first = await run(data, { only: added }); }
+        try { first = await run(data, { only: added, by: "add" }); }
         catch (e) { first = { saved: 0, failed: [{ error: String(e.message || e).slice(0, 200) }] }; }
       }
       return lib.json(res, 200, { ok: true, added, first });

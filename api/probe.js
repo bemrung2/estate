@@ -22,6 +22,18 @@ module.exports = async function handler(req, res) {
 
   /* 실거래가: 관심 단지마다 어디까지 받아지고 어디서 걸러지는지 */
   let deals = [];
+  /* 예약 실행이 실제로 돈 날: 기록에 남은 "누가 받았나"를 본다 (이 표시는 2026-11-17부터 남는다) */
+  let runs = null;
+  try {
+    const rows = (await open().data.summaries(400)) || [];
+    runs = {};
+    rows.forEach((r) => {
+      const by = (r.sources && r.sources.zigbang_by) || "(표시 전)";
+      const day = (runs[r.slot] = runs[r.slot] || {});
+      day[by] = (day[by] || 0) + 1;
+    });
+  } catch (e) { runs = String(e.message || e).slice(0, 120); }
+
   try {
     const home = open();
     const watches = home.data ? (await home.data.watches()) || [] : [];
@@ -38,7 +50,9 @@ module.exports = async function handler(req, res) {
       secret: process.env.CRON_SECRET ? "있음" : "없음 — /api/collect가 거절된다",
       deployment: process.env.VERCEL_ENV || "(로컬)",
       note: process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production"
-        ? "이 배포는 production이 아니다 — Vercel은 production 배포에서만 예약 실행을 돌린다" : ""
+        ? "이 배포는 production이 아니다 — Vercel은 production 배포에서만 예약 실행을 돌린다" : "",
+      /* 날마다 직방 기록을 누가 남겼나: cron(예약 실행) · auto(화면 열 때) · button(직접) · add(등록) */
+      by_day: runs
     },
     zigbang: z,
     deals_key: molit.enabled() ? molit.keyShape() : "MOLIT_SERVICE_KEY 없음",

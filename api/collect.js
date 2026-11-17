@@ -20,7 +20,7 @@ module.exports = async function handler(req, res) {
   const home = open();
   if (home.missing.length) return lib.setupError(res, home.missing);
   try {
-    const report = await run(home.data);
+    const report = await run(home.data, { by: "cron" });
     return lib.json(res, report.failed.length && !report.saved ? 502 : 200, { ok: true, ...report });
   } catch (e) {
     return lib.json(res, 502, { ok: false, error: "collect", message: String(e.message || e).slice(0, 300) });

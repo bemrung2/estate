@@ -61,7 +61,7 @@ async function fetchGroup(group) {
 
 /* One watch's list out of what the platforms answered. A platform that did not
    answer keeps what `before` (today's earlier record, if any) had from it. */
-function listingsFor(w, fetched, before) {
+function listingsFor(w, fetched, before, by) {
   const sources = Object.assign({}, before && before.sources);
   let listings = [];
   Object.keys(PLATFORMS).forEach((src) => {
@@ -71,6 +71,7 @@ function listingsFor(w, fetched, before) {
       listings = listings.concat(mine.map(keep));
       sources[src] = "ok";
       sources[src + "_at"] = new Date().toISOString();      /* 그곳에서 마지막으로 받은 때 */
+      if (by) sources[src + "_by"] = by;                    /* 누가 받았나: cron · auto · button · add */
     } else {
       const kept = ((before && before.listings) || []).filter((l) => (l.src || "zigbang") === src);
       listings = listings.concat(kept);
@@ -194,7 +195,7 @@ async function run(data, opts) {
     if (Object.keys(fetched.got).length) {
       const taken = new Date().toISOString();
       for (const w of group) {
-        const made = listingsFor(w, fetched, await data.snapshot(w.id, slot));
+        const made = listingsFor(w, fetched, await data.snapshot(w.id, slot), opts.by);
         await data.putSnapshot({ watch_id: w.id, slot, taken_at: taken, ...stats(made.listings), ...made });
         report.saved++;
       }
