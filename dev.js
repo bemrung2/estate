@@ -24,7 +24,8 @@ if (process.argv[2] === "collect") {
   return;
 }
 
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
+  ".png": "image/png", ".webmanifest": "application/manifest+json" };
 const PORT = Number(process.env.PORT) || 3000;
 
 http.createServer(async (req, res) => {
@@ -42,10 +43,10 @@ http.createServer(async (req, res) => {
   if (rel === "/") rel = "/index.html";
   const file = path.join(__dirname, rel);
   const type = TYPES[path.extname(file)];
-  if (!type || !/^\/(index\.html|app\.js|(ui|estate|style)\/[\w.-]+)$/.test(rel) || !fs.existsSync(file)) {
+  if (!type || !/^\/(index\.html|app\.js|manifest\.webmanifest|(ui|estate|style|icons)\/[\w.-]+)$/.test(rel) || !fs.existsSync(file)) {
     res.statusCode = 404; return res.end("not found");
   }
-  res.setHeader("content-type", type + "; charset=utf-8");
+  res.setHeader("content-type", type + (type.indexOf("image/") === 0 ? "" : "; charset=utf-8"));
   res.setHeader("cache-control", "no-store");
   fs.createReadStream(file).pipe(res);
 }).listen(PORT, () => console.log("BEMESTATE  http://localhost:" + PORT));
