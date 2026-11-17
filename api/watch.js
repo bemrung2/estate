@@ -21,7 +21,7 @@
  */
 const lib = require("./_core.js");
 const { open } = require("./_data.js");
-const { run, peek, ensure, refreshDeals, importNaver } = require("../collect/run.js");
+const { run, peek, ensure, refreshDeals, importNaver, slotOf } = require("../collect/run.js");
 const zigbang = require("../collect/zigbang.js");
 const naver = require("../collect/naver.js");
 const molit = require("../collect/molit.js");
@@ -129,7 +129,10 @@ module.exports = async function handler(req, res) {
     if (req.method === "POST") {
       const body = await lib.readBody(req, 400000);
       /* 고치는 일(등록 · 연결 · 삭제)은 주인만. 크롬 확장이 네이버 매물을 넣는 일은 로그인 없이 받는다. */
-      if (!(body && body.importNaver) && !auth.mayEdit(req)) {
+      /* 고치는 일(등록 · 연결 · 삭제)은 주인만. 크롬 확장의 네이버 매물 넣기와, 아침 수집이
+         빠졌을 때 메우는 자동 수집(collect: "auto")은 로그인 없이 받는다. */
+      const open = body && (body.importNaver || body.collect === "auto");
+      if (!open && !auth.mayEdit(req)) {
         return lib.json(res, 401, { ok: false, error: "auth", message: "카카오 로그인이 필요합니다." });
       }
 
@@ -156,6 +159,23 @@ module.exports = async function handler(req, res) {
 
       /* 첫 화면에서 끌어 바꾼 순서. 적히지 않은 관심은 그 뒤에 원래 차례대로 선다. */
       /* 지금 직방에서 받아 오늘 기록에 넣는다 (아침 수집과 같은 일) */
+      /* 아침 수집이 빠진 날을 메운다: 오전 9시 30분이 지났는데 오늘 직방 기록이 없는 관심이
+         있을 때만 돈다. 화면을 여는 사람과 크롬 확장이 부른다. */
+      if (body && body.collect === "auto") {
+        const kst = new Date(Date.now() + 9 * 3600 * 1000);
+        const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+        if (minutes < 9 * 60 + 30) return lib.json(res, 200, { ok: true, skipped: "early" });
+        const today = slotOf();
+        const done = {};
+        ((await data.summaries()) || []).forEach((s) => {
+          if (s.slot === today && s.sources && s.sources.zigbang === "ok") done[s.watch_id] = true;
+        });
+        const todo = existing.filter((w) => !done[w.id]).map((w) => w.id);
+        if (!todo.length) return lib.json(res, 200, { ok: true, skipped: "done" });
+        const report = await run(data, { only: todo });
+        return lib.json(res, 200, { ok: true, auto: true, ...report });
+      }
+
       if (body && body.collect) {
         const report = await run(data);
         return lib.json(res, 200, { ok: true, ...report });

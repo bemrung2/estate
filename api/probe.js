@@ -33,6 +33,13 @@ module.exports = async function handler(req, res) {
   return lib.json(res, 200, {
     ok: true,
     region: process.env.VERCEL_REGION || "(로컬)",
+    /* 아침 수집(Vercel Cron)이 돌 수 있는 상태인가 */
+    cron: {
+      secret: process.env.CRON_SECRET ? "있음" : "없음 — /api/collect가 거절된다",
+      deployment: process.env.VERCEL_ENV || "(로컬)",
+      note: process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production"
+        ? "이 배포는 production이 아니다 — Vercel은 production 배포에서만 예약 실행을 돌린다" : ""
+    },
     zigbang: z,
     deals_key: molit.enabled() ? molit.keyShape() : "MOLIT_SERVICE_KEY 없음",
     deals

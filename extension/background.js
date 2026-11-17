@@ -155,6 +155,12 @@ async function collect() {
   const log = [];
   try {
     if (!site) throw new Error("BEMESTATE 주소를 먼저 넣어 주세요.");
+    /* 아침 서버 수집이 빠졌으면 직방도 함께 메워 달라고 한다 (이미 받았으면 서버가 건너뛴다) */
+    try {
+      const z = await api(site, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ collect: "auto" }) });
+      if (z.auto) log.push({ ok: !(z.failed || []).length, text: "직방 — 아침 수집이 빠져 지금 " + z.saved + "개 평형을 기록했습니다" });
+    } catch (e) { log.push({ ok: false, text: "직방 — " + String(e.message || e) }); }
     const watches = (await api(site)).watches || [];
     const names = {};
     watches.forEach((w) => { if (w.naver_id) names[w.naver_id] = w.complex_name; });

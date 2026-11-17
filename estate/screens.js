@@ -201,10 +201,37 @@ export function renderList(view){
       var at = lastTaken(src);
       return at ? PLATFORM[src] + " " + stamp(at) : "";
     }).filter(Boolean);
-    if (said.length) pad.appendChild(el('<p class="store-note updated">마지막 업데이트 · ' + said.join(" · ") + '</p>'));
+    var upd = el('<p class="store-note updated">' + (said.length ? '마지막 업데이트 · ' + said.join(" · ") : '') + '</p>');
+    pad.appendChild(upd);
+    catchUp(upd);
   }
   pad.appendChild(pageFooter());
   swap(view, pad);
+}
+
+/*
+ * 아침 수집(Vercel의 예약 실행)이 빠진 날을 메운다. 오전 9시 30분이 지났는데 오늘 직방에서
+ * 받은 기록이 없으면, 화면을 연 김에 서버에 한 번 받아 달라고 한다. 이 창에서는 한 번만.
+ */
+var caughtUp = false;
+function catchUp(line){
+  if (caughtUp || Store.state !== "ok" || !Store.watches.length) return;
+  var kst = new Date(Date.now() + 9 * 3600 * 1000);
+  if (kst.getUTCHours() * 60 + kst.getUTCMinutes() < 9 * 60 + 30) return;
+  var today = kst.toISOString().slice(0, 10);
+  var stale = Store.watches.some(function(w){
+    var series = Store.series[w.id] || [], last = series[series.length - 1];
+    return !last || last.slot !== today || !last.sources || last.sources.zigbang !== "ok";
+  });
+  if (!stale) return;
+  caughtUp = true;
+  line.innerHTML = '<i class="spin"></i>오늘 직방 호가를 가져오는 중…';
+  Store.post({ collect: "auto" }).then(function(r){
+    if (r && r.saved) toastDone("오늘(" + dayShort(r.slot) + ") 직방 호가를 기록했습니다.");
+    nav.reload();
+  }).catch(function(e){
+    line.textContent = "오늘 직방 호가를 가져오지 못했습니다 — " + e.message;
+  });
 }
 
 /* 그 플랫폼에서 가장 최근에 받은 때 (모든 관심을 통틀어). 받은 때를 따로 적기 전의 기록은
