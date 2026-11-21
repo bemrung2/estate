@@ -367,8 +367,8 @@ function nums(w){
 /* 간단히 보기의 한 줄: 평형, 작은 추이선, 최저 호가와 그 아래 견줄 값 하나 */
 function watchRow(w, view){
   var n = nums(w);
-  var under = n.deal ? '실거래 ' + won(n.deal.price)
-    : moveMark(n.series);
+  /* 가격 아래 한 줄: 최저 호가가 마지막으로 움직인 것, 그리고 직전 실거래 */
+  var under = [moveMark(n.series), n.deal ? '실거래 ' + won(n.deal.price) : ''].filter(Boolean).join(' · ');
   var row = el('<div class="dense-row"><button class="dense-open" type="button">' +
     '<span class="dense-id"><span class="watch-type">' + esc(w.room_label) + '</span>' +
       '<small>' + TRADE[w.trade] + (n.last ? ' · 매물 ' + n.last.count + '건' : ' · 기록 전') + '</small></span>' +
